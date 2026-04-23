@@ -1,6 +1,6 @@
 import * as https from 'https';
 import { CONFIG } from '../config';
-import { loadLocalData, saveLocalData, needsUpdate, getLatestTradingDate } from './storage';
+import { loadLocalData, saveLocalData, needsUpdate } from './storage';
 
 export interface BondIndexData {
   date: string;   // YYYY-MM-DD
@@ -89,14 +89,6 @@ export async function fetchChinabondNetPriceIndex(): Promise<BondIndexData[]> {
     // 如果本地数据已覆盖到最近交易日，直接返回
     if (!needsUpdate(lastDate)) {
       console.log(`[Storage] ${STORAGE_KEY}: up-to-date (${stored.items.length} items, last: ${lastDate})`);
-      return stored.items;
-    }
-
-    // 如果上次拉取时的最新交易日和现在一致，不再重复拉取
-    const lastUpdateDate = stored.lastUpdate?.split('T')[0];
-    const latestTD = getLatestTradingDate();
-    if (lastUpdateDate && lastUpdateDate >= latestTD) {
-      console.log(`[Storage] ${STORAGE_KEY}: already fetched for ${latestTD}, using cached (${stored.items.length} items, last: ${lastDate})`);
       return stored.items;
     }
   }

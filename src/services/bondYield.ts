@@ -82,18 +82,8 @@ export async function getBondYieldData(): Promise<BondYieldData[]> {
       return stored.items;
     }
 
-    // 如果上次拉取时的最新交易日和现在一致，不再重复拉取
-    const lastUpdateDate = stored.lastUpdate?.split('T')[0];
-    const latestTD = getLatestTradingDate();
-    if (lastUpdateDate && lastUpdateDate >= latestTD) {
-      console.log(`[Storage] ${STORAGE_KEY}: already fetched for ${latestTD}, using cached (${stored.items.length} items, last: ${lastDate})`);
-      return stored.items;
-    }
-
-    // 增量更新
-    const nextDay = new Date(lastDate);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const startDate = nextDay.toISOString().split('T')[0];
+    // 增量更新：从最后一条数据日期开始（API需要至少2天范围）
+    const startDate = lastDate;
     const endDate = getLatestTradingDate();
 
     try {
