@@ -1,6 +1,6 @@
 import * as https from 'https';
 import { CONFIG } from '../config';
-import { generateReportImage, ReportData } from './reportImage';
+import { generateDashboardImage, DashboardData } from './dashboardImage';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
@@ -151,7 +151,7 @@ export async function sendFeishuMessage(title: string, content: string): Promise
 }
 
 export async function sendDailyReport(data: {
-  returnDiff: { date: string; diff: number; compass: string };
+  returnDiff: { date: string; diff: number; compass: string; divReturn: number; allReturn: number };
   bondWeather: { date: string; weather: string; value: number; change: number; temperature: number };
   thermometer: { date: string; temperature: number; status: string; pe: number; bondYield: number; erp: number };
 }): Promise<void> {
@@ -163,22 +163,22 @@ export async function sendDailyReport(data: {
 
   const { returnDiff, bondWeather, thermometer } = data;
 
-  // 生成报告图并上传
+  // 生成Dashboard图并上传
   let imageKey: string | null = null;
   try {
-    const reportData: ReportData = {
+    const dashData: DashboardData = {
       date: returnDiff.date,
-      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass },
+      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
       bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
       thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
     };
-    const imageBuf = await generateReportImage(reportData);
+    const imageBuf = await generateDashboardImage(dashData);
     imageKey = await uploadImage(imageBuf);
   } catch (err) {
-    console.error('[Feishu] Report image generation failed:', err instanceof Error ? err.message : err);
+    console.error('[Feishu] Dashboard image generation failed:', err instanceof Error ? err.message : err);
   }
 
-  // 构建卡片消息，用图片替代数据文本
+  // 构建卡片消息
   const elements: any[] = [];
 
   if (imageKey) {

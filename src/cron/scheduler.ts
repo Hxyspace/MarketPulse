@@ -24,6 +24,8 @@ export function startScheduler() {
           date: returnDiff.latest.date,
           diff: returnDiff.latest.diff,
           compass: returnDiff.latest.compass,
+          divReturn: returnDiff.latest.dividendReturn40d,
+          allReturn: returnDiff.latest.allShareReturn40d,
         },
         bondWeather: {
           date: bondBarometer.latest.date,
