@@ -1,6 +1,6 @@
 import cron from 'node-cron';
 import { CONFIG } from '../config';
-import { getReturnDiffData } from '../calculators/returnDiff';
+import { getDividendCompassData } from '../calculators/dividendCompass';
 import { getBondBarometer } from '../calculators/bondBarometer';
 import { getFundThermometer } from '../calculators/fundThermometer';
 import { sendDailyReport } from '../services/feishu';
@@ -14,7 +14,7 @@ export function startScheduler() {
     try {
       // 并行获取最新数据（storage层会自动增量更新）
       const [returnDiff, bondBarometer, thermometer] = await Promise.all([
-        getReturnDiffData(),
+        getDividendCompassData(),
         getBondBarometer(),
         getFundThermometer(),
       ]);

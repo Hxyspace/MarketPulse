@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { getReturnDiffData, getReturnDiffByDate } from '../calculators/returnDiff';
+import { getDividendCompassData, getDividendCompassByDate } from '../calculators/dividendCompass';
 import { getBondBarometer, getBondByDate, getBondWeather } from '../calculators/bondBarometer';
 import { getFundThermometer, getFundThermometerByDate } from '../calculators/fundThermometer';
 
@@ -27,7 +27,7 @@ function isValidDate(d: string | undefined): d is string {
 router.get('/return-diff', async (req: Request, res: Response) => {
   try {
     const date = req.query.date as string | undefined;
-    const data = await withCache('returnDiff', getReturnDiffData);
+    const data = await withCache('returnDiff', getDividendCompassData);
     if (isValidDate(date)) {
       let latest = data.latest;
       for (const r of data.history) {
@@ -132,7 +132,7 @@ router.get('/query', async (req: Request, res: Response) => {
     }
 
     const [returnDiff, bond, fund] = await Promise.all([
-      getReturnDiffByDate(date).catch(() => null),
+      getDividendCompassByDate(date).catch(() => null),
       getBondByDate(date).catch(() => null),
       getFundThermometerByDate(date).catch(() => null),
     ]);

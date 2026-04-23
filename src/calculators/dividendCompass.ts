@@ -1,7 +1,7 @@
 import { fetchDividendLowVol, fetchAllShare, KlineData } from '../services/eastmoney';
 import { CONFIG } from '../config';
 
-export interface ReturnDiffResult {
+export interface CompassResult {
   date: string;
   dividendReturn40d: number;  // 红利低波40日收益率 %
   allShareReturn40d: number;  // 中证全指40日收益率 %
@@ -10,9 +10,9 @@ export interface ReturnDiffResult {
   interpretation: string;     // 操作建议
 }
 
-export interface ReturnDiffHistory {
-  latest: ReturnDiffResult;
-  history: ReturnDiffResult[];  // 2020年以来的历史数据
+export interface CompassHistory {
+  latest: CompassResult;
+  history: CompassResult[];  // 2020年以来的历史数据
 }
 
 function getDateStr(d: Date): string {
@@ -23,11 +23,11 @@ function getDateStr(d: Date): string {
  * 计算40日收益差
  * 公式：(红利低波今日收盘/红利低波40个交易日前收盘 - 1) - (中证全指今日收盘/中证全指40个交易日前收盘 - 1)
  */
-export function calculate40DayReturnDiff(
+export function calculate40DayDiff(
   dividendData: KlineData[],
   allShareData: KlineData[],
   tradingDays: number = 40,
-): ReturnDiffResult[] {
+): CompassResult[] {
   // 对齐日期
   const dateSet = new Set(dividendData.map(d => d.date));
   const alignedAllShare = allShareData.filter(d => dateSet.has(d.date));
@@ -39,7 +39,7 @@ export function calculate40DayReturnDiff(
     return [];
   }
 
-  const results: ReturnDiffResult[] = [];
+  const results: CompassResult[] = [];
   for (let i = tradingDays; i < alignedDividend.length; i++) {
     const divToday = alignedDividend[i].close;
     const divPrev = alignedDividend[i - tradingDays].close;
@@ -80,7 +80,7 @@ function getCompassInterpretation(diff: number): string {
 /**
  * 获取完整的40日收益差数据（2020年至今）
  */
-export async function getReturnDiffData(): Promise<ReturnDiffHistory> {
+export async function getDividendCompassData(): Promise<CompassHistory> {
   const endDate = getDateStr(new Date());
   const startDate = '20191101'; // 从2019年11月开始取数据，确保2020年1月有40日数据
 
@@ -89,7 +89,7 @@ export async function getReturnDiffData(): Promise<ReturnDiffHistory> {
     fetchAllShare(startDate, endDate),
   ]);
 
-  const allResults = calculate40DayReturnDiff(dividendData, allShareData);
+  const allResults = calculate40DayDiff(dividendData, allShareData);
 
   // 只保留2020年以来的数据
   const history = allResults.filter(r => r.date >= '2020-01-01');
@@ -101,10 +101,10 @@ export async function getReturnDiffData(): Promise<ReturnDiffHistory> {
 /**
  * 查询指定日期的40日收益差
  */
-export async function getReturnDiffByDate(queryDate: string): Promise<ReturnDiffResult | null> {
-  const { history } = await getReturnDiffData();
+export async function getDividendCompassByDate(queryDate: string): Promise<CompassResult | null> {
+  const { history } = await getDividendCompassData();
   // 找到该日期或之前最近的交易日
-  let best: ReturnDiffResult | null = null;
+  let best: CompassResult | null = null;
   for (const r of history) {
     if (r.date <= queryDate) best = r;
     else break;
