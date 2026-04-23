@@ -1,5 +1,6 @@
 import * as https from 'https';
 import { CONFIG } from '../config';
+import { generateReportImage, ReportData } from './reportImage';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
@@ -74,6 +75,63 @@ async function sendMessage(chatId: string, msgType: string, content: string): Pr
   }
 }
 
+/**
+ * 上传图片到飞书，返回 image_key
+ */
+async function uploadImage(imageBuffer: Buffer): Promise<string> {
+  const token = await getTenantAccessToken();
+  const boundary = '----FormBoundary' + Date.now().toString(36);
+
+  const parts: Buffer[] = [];
+  // image_type field
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image_type"\r\n\r\nmessage\r\n`));
+  // image file
+  parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="report.png"\r\nContent-Type: image/png\r\n\r\n`));
+  parts.push(imageBuffer);
+  parts.push(Buffer.from(`\r\n--${boundary}--\r\n`));
+
+  const body = Buffer.concat(parts);
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'open.feishu.cn',
+      path: '/open-apis/im/v1/images',
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': body.length,
+      },
+    }, (res) => {
+      let data = '';
+      res.on('data', (chunk: string) => { data += chunk; });
+      res.on('end', () => {
+        try {
+          const result = JSON.parse(data);
+          if (result.code !== 0) {
+            reject(new Error(`Upload image failed: code=${result.code} msg=${result.msg}`));
+          } else {
+            console.log(`[Feishu] Image uploaded: ${result.data.image_key}`);
+            resolve(result.data.image_key);
+          }
+        } catch {
+          reject(new Error('Failed to parse upload response'));
+        }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * 发送图片消息
+ */
+async function sendImageMessage(chatId: string, imageKey: string): Promise<void> {
+  await sendMessage(chatId, 'image', JSON.stringify({ image_key: imageKey }));
+}
+
 export async function sendFeishuMessage(title: string, content: string): Promise<void> {
   const { chatId } = CONFIG.feishu;
   if (!chatId) {
@@ -97,27 +155,63 @@ export async function sendDailyReport(data: {
   bondWeather: { date: string; weather: string; value: number; change: number; temperature: number };
   thermometer: { date: string; temperature: number; status: string; pe: number; bondYield: number; erp: number };
 }): Promise<void> {
+  const { chatId } = CONFIG.feishu;
+  if (!chatId) {
+    console.warn('[Feishu] FEISHU_CHAT_ID not configured, skipping notification');
+    return;
+  }
+
   const { returnDiff, bondWeather, thermometer } = data;
 
-  const content = [
-    `**📊 每日市场速报 ${returnDiff.date}**`,
-    '',
-    '---',
-    '',
-    `**01 红利罗盘 · ${returnDiff.compass}**`,
-    `红利低波相对全A 40日收益差：**${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%**`,
-    '',
-    `**02 债市晴雨表 · ${bondWeather.weather}**`,
-    `中债新综合净价：${bondWeather.value}（${bondWeather.change > 0 ? '+' : ''}${bondWeather.change}）`,
-    `债市温度：**${bondWeather.temperature}℃**`,
-    '',
-    `**03 基金温度计 · ${thermometer.temperature}℃**`,
-    `${thermometer.status}`,
-    `沪深300 PE：${thermometer.pe} | 10年国债：${thermometer.bondYield}% | 股债利差：${thermometer.erp}%`,
-    '',
-    '---',
-    `📈 Dashboard: http://localhost:${CONFIG.port}`,
-  ].join('\n');
+  // 生成报告图并上传
+  let imageKey: string | null = null;
+  try {
+    const reportData: ReportData = {
+      date: returnDiff.date,
+      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass },
+      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
+      thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
+    };
+    const imageBuf = await generateReportImage(reportData);
+    imageKey = await uploadImage(imageBuf);
+  } catch (err) {
+    console.error('[Feishu] Report image generation failed:', err instanceof Error ? err.message : err);
+  }
 
-  await sendFeishuMessage(`市场速报 ${returnDiff.date}`, content);
+  // 构建卡片消息，用图片替代数据文本
+  const elements: any[] = [];
+
+  if (imageKey) {
+    elements.push({
+      tag: 'img',
+      img_key: imageKey,
+      alt: { tag: 'plain_text', content: '市场速报' },
+    });
+  } else {
+    // fallback: 纯文本
+    elements.push({ tag: 'markdown', content: [
+      `**01 红利罗盘 · ${returnDiff.compass}**`,
+      `收益差：${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%`,
+      '',
+      `**02 债市晴雨表 · ${bondWeather.weather}**`,
+      `净价：${bondWeather.value}（${bondWeather.change > 0 ? '+' : ''}${bondWeather.change}）温度：${bondWeather.temperature}℃`,
+      '',
+      `**03 基金温度计 · ${thermometer.temperature}℃**`,
+      `${thermometer.status}`,
+      `PE ${thermometer.pe} | 国债 ${thermometer.bondYield}% | ERP ${thermometer.erp}%`,
+    ].join('\n') });
+  }
+
+  elements.push({ tag: 'hr' });
+  elements.push({ tag: 'markdown', content: `📈 [Dashboard](http://localhost:${CONFIG.port})` });
+
+  const card = {
+    header: {
+      title: { tag: 'plain_text', content: `📊 市场速报 ${returnDiff.date}` },
+      template: 'blue',
+    },
+    elements,
+  };
+
+  await sendMessage(chatId, 'interactive', JSON.stringify(card));
 }
