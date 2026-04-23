@@ -4,7 +4,7 @@ import * as echarts from 'echarts';
 export interface DashboardData {
   date: string;
   returnDiff: { diff: number; status: string; divReturn: number; allReturn: number };
-  bondWeather: { weather: string; value: number; change: number; temperature: number };
+  bondWeather: { weather: string; value: number; change: number; temperature: number; status: string };
   thermometer: { temperature: number; status: string; pe: number; bondYield: number; erp: number };
   // Optional chart histories
   diffHistory?: { date: string; diff: number }[];
@@ -270,7 +270,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
       label: '红利罗盘 · 40日收益差',
       value: `${data.returnDiff.diff > 0 ? '+' : ''}${data.returnDiff.diff}%`,
       valueColor: diffColor(data.returnDiff.diff),
-      sub: data.returnDiff.status,
+      sub: data.returnDiff.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim(),
       accent: [ACCENT, '#62b5f6'],
       tint: 'rgba(0,103,192,0.02)',
     },
@@ -278,7 +278,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
       label: '债市净价 · 中债新综合',
       value: `${data.bondWeather.value.toFixed(2)}`,
       valueColor: TEXT_SEC,
-      sub: `${data.bondWeather.change > 0 ? '+' : ''}${data.bondWeather.change}`,
+      sub: `${data.bondWeather.weather} ${data.bondWeather.change > 0 ? '+' : ''}${data.bondWeather.change}`,
       accent: [GREEN, '#34a853'],
       tint: 'rgba(16,124,16,0.02)',
     },
@@ -286,7 +286,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
       label: '债市温度',
       value: `${data.bondWeather.temperature}℃`,
       valueColor: tempColor(data.bondWeather.temperature),
-      sub: data.bondWeather.weather,
+      sub: data.bondWeather.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim(),
       accent: [BLUE, '#4ea8de'],
       tint: 'rgba(0,103,192,0.02)',
     },
@@ -379,7 +379,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
 
   ctx.fillStyle = diffColor(data.returnDiff.diff);
   ctx.font = '700 20px "Segoe UI", "Microsoft YaHei", sans-serif';
-  ctx.fillText(data.returnDiff.status, detailX, detailY);
+  ctx.fillText(`${data.returnDiff.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim()} · ${data.returnDiff.diff > 0 ? '+' : ''}${data.returnDiff.diff}%`, detailX, detailY);
 
   ctx.fillStyle = TEXT_SEC;
   ctx.font = '13px "Segoe UI", "Microsoft YaHei", sans-serif';
@@ -463,7 +463,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   const detailY2 = sectionY + 32;
   ctx.fillStyle = tempColor(data.bondWeather.temperature);
   ctx.font = '700 20px "Segoe UI", "Microsoft YaHei", sans-serif';
-  ctx.fillText(`${data.bondWeather.weather} · ${data.bondWeather.temperature}℃`, detailX, detailY2);
+  ctx.fillText(`${data.bondWeather.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim()} · ${data.bondWeather.temperature}℃`, detailX, detailY2);
 
   ctx.fillStyle = TEXT_SEC;
   ctx.font = '13px "Segoe UI", "Microsoft YaHei", sans-serif';

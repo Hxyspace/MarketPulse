@@ -33,6 +33,7 @@ export function startScheduler() {
           value: bondBarometer.latest.value,
           change: bondBarometer.latest.change,
           temperature: bondBarometer.temperature.value,
+          status: bondBarometer.temperature.status,
         },
         thermometer: {
           date: thermometer.date,

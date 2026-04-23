@@ -4,7 +4,7 @@ import * as echarts from 'echarts';
 export interface ReportData {
   date: string;
   returnDiff: { diff: number; status: string };
-  bondWeather: { weather: string; value: number; change: number; temperature: number };
+  bondWeather: { weather: string; value: number; change: number; temperature: number; status: string };
   thermometer: { temperature: number; status: string; pe: number; bondYield: number; erp: number };
 }
 
@@ -160,7 +160,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
       label: '红利罗盘',
       value: `${data.returnDiff.diff > 0 ? '+' : ''}${data.returnDiff.diff}%`,
       valueColor: diffColor(data.returnDiff.diff),
-      status: data.returnDiff.status,
+      status: data.returnDiff.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim(),
       detail: `40日收益差`,
       gaugeValue: data.returnDiff.diff,
       gaugeMin: -15,
@@ -170,7 +170,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
       label: '债市晴雨表',
       value: `${data.bondWeather.temperature}℃`,
       valueColor: tempColor(data.bondWeather.temperature),
-      status: data.bondWeather.weather,
+      status: data.bondWeather.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim(),
       detail: `净价 ${data.bondWeather.value.toFixed(2)} (${data.bondWeather.change > 0 ? '+' : ''}${data.bondWeather.change})`,
       gaugeValue: data.bondWeather.temperature,
       gaugeMin: 0,

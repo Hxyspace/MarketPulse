@@ -153,7 +153,7 @@ export async function sendFeishuMessage(title: string, content: string): Promise
 
 export async function sendDailyReport(data: {
   returnDiff: { date: string; diff: number; status: string; divReturn: number; allReturn: number };
-  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number };
+  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number; status: string };
   thermometer: { date: string; temperature: number; status: string; pe: number; bondYield: number; erp: number };
   diffHistory?: { date: string; diff: number }[];
   bondHistory?: { date: string; value: number }[];
@@ -173,7 +173,7 @@ export async function sendDailyReport(data: {
     const reportData: ReportData = {
       date: returnDiff.date,
       returnDiff: { diff: returnDiff.diff, status: returnDiff.status },
-      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
+      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature, status: bondWeather.status },
       thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
     };
     const buf = await generateReportImage(reportData);
@@ -212,7 +212,7 @@ export async function sendDailyReport(data: {
     const dashData: DashboardData = {
       date: returnDiff.date,
       returnDiff: { diff: returnDiff.diff, status: returnDiff.status, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
-      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
+      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature, status: bondWeather.status },
       thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
       diffHistory: data.diffHistory,
       bondHistory: data.bondHistory,
