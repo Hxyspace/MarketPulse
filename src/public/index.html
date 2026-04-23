@@ -958,12 +958,12 @@ async function loadBondBarometer() {
     var latest = data.latest, temperature = data.temperature;
 
     document.getElementById('bond-value').textContent = latest.value.toFixed(4);
-    document.getElementById('bond-status').textContent = latest.weather + ' · Δ' + (latest.change > 0 ? '+' : '') + latest.change + ' · ' + latest.date;
+    document.getElementById('bond-status').textContent = latest.weather + ' · Δ' + (latest.change > 0 ? '+' : '') + latest.change;
 
     var btEl = document.getElementById('bond-temp-value');
     btEl.textContent = temperature.value + '℃';
     btEl.className = 'indicator-value ' + tempClass(temperature.value);
-    document.getElementById('bond-temp-status').textContent = temperature.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim() + ' · P' + temperature.percentile + '%';
+    document.getElementById('bond-temp-status').textContent = temperature.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim() + ' · ' + latest.date;
 
     renderGauge(document.getElementById('bondTempChart'), temperature.value, '');
 
