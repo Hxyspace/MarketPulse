@@ -1,0 +1,166 @@
+import { getRecentBondData, getAllBondData, BondIndexData } from '../services/chinabond';
+
+export interface BondBarometerResult {
+  latest: {
+    date: string;
+    value: number;
+    change: number;        // 较前日变动
+    changePercent: number; // 较前日变动百分比
+    weather: string;       // 晴天/阴天/雨天
+  };
+  temperature: {
+    value: number;          // 债市温度 ℃
+    percentile: number;     // 净价指数在历史中的百分位
+    status: string;         // 状态描述
+    interpretation: string; // 解读
+  };
+  history: BondIndexData[]; // 全量历史趋势（2002至今）
+  recentDays: {
+    date: string;
+    value: number;
+    change: number;
+    weather: string;
+  }[];
+}
+
+/**
+ * 根据中债新综合净价指数单日涨跌判断债市天气
+ * 涨 > 0.02 → 大晴天
+ * 涨 0 ~ 0.02 → 晴天
+ * 跌 0 ~ -0.02 → 阴天
+ * 跌 < -0.02 → 雨天
+ * 跌 < -0.1 → 暴雨
+ */
+export function getBondWeather(change: number): string {
+  if (change > 0.02) return '大晴天☀️';
+  if (change > 0) return '晴天🌤️';
+  if (change > -0.02) return '阴天☁️';
+  if (change > -0.1) return '雨天🌧️';
+  return '暴雨⛈️';
+}
+
+/**
+ * 债市温度：基于中债新综合净价指数在近N年历史中的百分位
+ * 净价指数越高 → 债券价格越贵 → 收益率越低 → 温度越高
+ * 温度高意味着债市偏贵（收益率偏低），追涨风险大
+ * 温度低意味着债市便宜（收益率偏高），适合配置
+ */
+function calculateBondTemperature(allData: BondIndexData[], currentValue: number) {
+  // 使用近5年数据计算百分位
+  const recent5y = allData.slice(-1250); // 约5年交易日
+  const values = recent5y.map(d => d.value);
+
+  const belowCount = values.filter(v => v < currentValue).length;
+  const percentile = (belowCount / values.length) * 100;
+
+  // 温度 = 百分位（0~100℃），与文章一致
+  // 0-30℃ 低估，30-80℃ 正常，80℃+ 高估
+  const temperature = Math.round(percentile * 10) / 10;
+
+  let status: string;
+  let interpretation: string;
+
+  if (temperature >= 80) {
+    status = '🔥 高温区';
+    interpretation = '债市高估，有回撤风险，建议适时止盈，不宜大笔加仓';
+  } else if (temperature >= 30) {
+    status = '😊 正常区';
+    interpretation = '债市估值适中，可安心定投持有';
+  } else {
+    status = '❄️ 低温区';
+    interpretation = '债市低估，性价比高，适合单笔买入或定投';
+  }
+
+  return {
+    value: temperature,
+    percentile: Math.round(percentile * 10) / 10,
+    status,
+    interpretation,
+  };
+}
+
+/**
+ * 获取债市晴雨表数据
+ */
+export async function getBondBarometer(): Promise<BondBarometerResult> {
+  // 获取全量历史数据（2002年至今）
+  const allHistory = await getAllBondData();
+
+  if (allHistory.length < 2) {
+    throw new Error('Bond data insufficient');
+  }
+
+  const latestData = allHistory[allHistory.length - 1];
+  const prevData = allHistory[allHistory.length - 2];
+  const change = latestData.value - prevData.value;
+  const changePercent = (change / prevData.value) * 100;
+
+  // 计算债市温度
+  const temperature = calculateBondTemperature(allHistory, latestData.value);
+
+  // 最近30天数据
+  const recentDays = [];
+  const last30 = allHistory.slice(-31);
+  for (let i = 1; i < last30.length; i++) {
+    const dayChange = last30[i].value - last30[i - 1].value;
+    recentDays.push({
+      date: last30[i].date,
+      value: last30[i].value,
+      change: Math.round(dayChange * 10000) / 10000,
+      weather: getBondWeather(dayChange),
+    });
+  }
+
+  return {
+    latest: {
+      date: latestData.date,
+      value: latestData.value,
+      change: Math.round(change * 10000) / 10000,
+      changePercent: Math.round(changePercent * 10000) / 10000,
+      weather: getBondWeather(change),
+    },
+    temperature,
+    history: allHistory,
+    recentDays,
+  };
+}
+
+/**
+ * 查询指定日期的债市温度
+ */
+export async function getBondByDate(queryDate: string): Promise<{
+  date: string;
+  value: number;
+  change: number;
+  weather: string;
+  temperature: { value: number; percentile: number; status: string; interpretation: string };
+} | null> {
+  const allHistory = await getAllBondData();
+  // 找到该日期或之前最近的交易日
+  let idx = -1;
+  for (let i = 0; i < allHistory.length; i++) {
+    if (allHistory[i].date <= queryDate) idx = i;
+    else break;
+  }
+  if (idx < 1) return null;
+
+  const target = allHistory[idx];
+  const prev = allHistory[idx - 1];
+  const change = Math.round((target.value - prev.value) * 10000) / 10000;
+
+  // 取该日期之前5年数据计算温度
+  const fiveYearsAgo = new Date(target.date);
+  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
+  const fiveYearsAgoStr = fiveYearsAgo.toISOString().split('T')[0];
+  const dataFor5y = allHistory.filter(d => d.date >= fiveYearsAgoStr && d.date <= target.date);
+
+  const temperature = calculateBondTemperature(dataFor5y, target.value);
+
+  return {
+    date: target.date,
+    value: target.value,
+    change,
+    weather: getBondWeather(change),
+    temperature,
+  };
+}

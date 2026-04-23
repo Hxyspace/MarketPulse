@@ -1,0 +1,52 @@
+import cron from 'node-cron';
+import { CONFIG } from '../config';
+import { getReturnDiffData } from '../calculators/returnDiff';
+import { getBondBarometer } from '../calculators/bondBarometer';
+import { getFundThermometer } from '../calculators/fundThermometer';
+import { sendDailyReport } from '../services/feishu';
+
+export function startScheduler() {
+  console.log(`[Cron] Scheduling daily report: ${CONFIG.cron.dailyReport}`);
+
+  cron.schedule(CONFIG.cron.dailyReport, async () => {
+    console.log(`[Cron] Running daily report at ${new Date().toISOString()}`);
+
+    try {
+      // 并行获取最新数据（storage层会自动增量更新）
+      const [returnDiff, bondBarometer, thermometer] = await Promise.all([
+        getReturnDiffData(),
+        getBondBarometer(),
+        getFundThermometer(),
+      ]);
+
+      await sendDailyReport({
+        returnDiff: {
+          date: returnDiff.latest.date,
+          diff: returnDiff.latest.diff,
+          compass: returnDiff.latest.compass,
+        },
+        bondWeather: {
+          date: bondBarometer.latest.date,
+          weather: bondBarometer.latest.weather,
+          value: bondBarometer.latest.value,
+          change: bondBarometer.latest.change,
+          temperature: bondBarometer.temperature.value,
+        },
+        thermometer: {
+          date: thermometer.date,
+          temperature: thermometer.temperature,
+          status: thermometer.status,
+          pe: thermometer.pe,
+          bondYield: thermometer.bondYield,
+          erp: thermometer.erp,
+        },
+      });
+
+      console.log('[Cron] Daily report sent successfully');
+    } catch (err) {
+      console.error('[Cron] Daily report failed:', err);
+    }
+  }, {
+    timezone: 'Asia/Shanghai',
+  });
+}
