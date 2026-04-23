@@ -23,12 +23,13 @@ export const CONFIG = {
     appId: process.env.FEISHU_APP_ID || '',
     appSecret: process.env.FEISHU_APP_SECRET || '',
     chatId: process.env.FEISHU_CHAT_ID || '',
+    urgentOpenId: process.env.FEISHU_URGENT_OPEN_ID || '',
   },
 
   // 定时任务 (cron 表达式)
   cron: {
-    // 每个交易日 18:00 发送报告
-    dailyReport: '0 18 * * 1-5',
+    // 每个交易日 09:00 发送报告
+    dailyReport: '0 9 * * 1-5',
   },
 
   // 40日收益差参数

@@ -171,3 +171,18 @@ export async function getFundThermometerByDate(queryDate: string): Promise<FundT
     erpHistory: allFiltered.map(d => ({ date: d.date, erp: Math.round(d.erp * 100) / 100, close: d.close })),
   };
 }
+
+/**
+ * 获取前一交易日的基金温度状态（用于极端信号检测）
+ */
+export function getPrevFundStatus(result: FundThermometerResult): string {
+  const history = result.erpHistory;
+  if (history.length < 2) return '';
+  const recent10y = history.slice(-2500);
+  const prev = recent10y[recent10y.length - 2];
+  if (!prev) return '';
+  const erpValues = recent10y.map(d => d.erp);
+  const prevPercentile = (erpValues.filter(v => v < prev.erp).length / erpValues.length) * 100;
+  const prevTemperature = Math.round((100 - prevPercentile) * 10) / 10;
+  return getTemperatureStatus(prevTemperature);
+}

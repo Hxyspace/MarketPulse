@@ -1,8 +1,8 @@
 import cron from 'node-cron';
 import { CONFIG } from '../config';
 import { getDividendCompassData } from '../calculators/dividendCompass';
-import { getBondBarometer } from '../calculators/bondBarometer';
-import { getFundThermometer } from '../calculators/fundThermometer';
+import { getBondBarometer, getPrevBondStatus } from '../calculators/bondBarometer';
+import { getFundThermometer, getPrevFundStatus } from '../calculators/fundThermometer';
 import { sendDailyReport } from '../services/feishu';
 
 export function startScheduler() {
@@ -19,11 +19,14 @@ export function startScheduler() {
         getFundThermometer(),
       ]);
 
+      const prevDiff = returnDiff.history.length >= 2 ? returnDiff.history[returnDiff.history.length - 2] : null;
+
       await sendDailyReport({
         returnDiff: {
           date: returnDiff.latest.date,
           diff: returnDiff.latest.diff,
           status: returnDiff.latest.status,
+          prevStatus: prevDiff?.status || '',
           divReturn: returnDiff.latest.dividendReturn40d,
           allReturn: returnDiff.latest.allShareReturn40d,
         },
@@ -34,11 +37,13 @@ export function startScheduler() {
           change: bondBarometer.latest.change,
           temperature: bondBarometer.temperature.value,
           status: bondBarometer.temperature.status,
+          prevStatus: getPrevBondStatus(bondBarometer),
         },
         thermometer: {
           date: thermometer.date,
           temperature: thermometer.temperature,
           status: thermometer.status,
+          prevStatus: getPrevFundStatus(thermometer),
           pe: thermometer.pe,
           bondYield: thermometer.bondYield,
           erp: thermometer.erp,

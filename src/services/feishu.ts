@@ -5,14 +5,14 @@ import { generateDashboardImage, DashboardData } from './dashboardImage';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
-async function httpPost(url: string, body: string, headers: Record<string, string>): Promise<{ status: number; data: string }> {
+async function httpRequest(url: string, body: string, headers: Record<string, string>, method: string = 'POST'): Promise<{ status: number; data: string }> {
   return new Promise((resolve, reject) => {
     const u = new URL(url);
     const req = https.request({
       hostname: u.hostname,
       port: 443,
       path: u.pathname + u.search,
-      method: 'POST',
+      method,
       headers: { ...headers, 'Content-Length': String(Buffer.byteLength(body)) },
     }, (res) => {
       let data = '';
@@ -24,6 +24,9 @@ async function httpPost(url: string, body: string, headers: Record<string, strin
     req.end();
   });
 }
+
+// Backward compat alias
+const httpPost = httpRequest;
 
 async function getTenantAccessToken(): Promise<string> {
   const { appId, appSecret } = CONFIG.feishu;
@@ -51,7 +54,7 @@ async function getTenantAccessToken(): Promise<string> {
   return tokenCache.token;
 }
 
-async function sendMessage(chatId: string, msgType: string, content: string): Promise<void> {
+async function sendMessage(chatId: string, msgType: string, content: string): Promise<string | null> {
   const token = await getTenantAccessToken();
   const body = JSON.stringify({
     receive_id: chatId,
@@ -71,8 +74,10 @@ async function sendMessage(chatId: string, msgType: string, content: string): Pr
   const result = JSON.parse(resp.data);
   if (result.code !== 0) {
     console.error(`[Feishu] Send message failed: code=${result.code} msg=${result.msg}`);
+    return null;
   } else {
     console.log(`[Feishu] Message sent to ${chatId}`);
+    return result.data?.message_id || null;
   }
 }
 
@@ -133,6 +138,27 @@ async function sendImageMessage(chatId: string, imageKey: string): Promise<void>
   await sendMessage(chatId, 'image', JSON.stringify({ image_key: imageKey }));
 }
 
+async function urgentApp(messageId: string): Promise<void> {
+  const openId = CONFIG.feishu.urgentOpenId;
+  if (!openId) return;
+  const token = await getTenantAccessToken();
+  const resp = await httpRequest(
+    `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/urgent_app?user_id_type=open_id`,
+    JSON.stringify({ user_id_list: [openId] }),
+    {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json; charset=utf-8',
+    },
+    'PATCH',
+  );
+  const result = JSON.parse(resp.data);
+  if (result.code !== 0) {
+    console.error(`[Feishu] Urgent failed: code=${result.code} msg=${result.msg}`);
+  } else {
+    console.log(`[Feishu] Urgent sent for message ${messageId}`);
+  }
+}
+
 export async function sendFeishuMessage(title: string, content: string): Promise<void> {
   const { chatId } = CONFIG.feishu;
   if (!chatId) {
@@ -152,9 +178,9 @@ export async function sendFeishuMessage(title: string, content: string): Promise
 }
 
 export async function sendDailyReport(data: {
-  returnDiff: { date: string; diff: number; status: string; divReturn: number; allReturn: number };
-  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number; status: string };
-  thermometer: { date: string; temperature: number; status: string; pe: number; bondYield: number; erp: number };
+  returnDiff: { date: string; diff: number; status: string; prevStatus: string; divReturn: number; allReturn: number };
+  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number; status: string; prevStatus: string };
+  thermometer: { date: string; temperature: number; status: string; prevStatus: string; pe: number; bondYield: number; erp: number };
   diffHistory?: { date: string; diff: number }[];
   bondHistory?: { date: string; value: number }[];
   erpHistory?: { date: string; erp: number; close: number }[];
@@ -223,5 +249,30 @@ export async function sendDailyReport(data: {
     await sendImageMessage(chatId, dashImageKey);
   } catch (err) {
     console.error('[Feishu] Dashboard image failed:', err instanceof Error ? err.message : err);
+  }
+
+  // 3) 极端信号预警：前一交易日在正常区，当日进入极端区时发送加急消息
+  const alerts: string[] = [];
+
+  const isNormal = (s: string) => s.includes('适中') || s.includes('正常');
+  const isCold = (s: string) => s.includes('过冷') || s.includes('低估') || s.includes('低温');
+  const isHot = (s: string) => s.includes('过热') || s.includes('高估') || s.includes('高温');
+
+  if (isNormal(returnDiff.prevStatus) && isHot(returnDiff.status)) alerts.push(`🔥 红利进入过热区（收益差 ${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%），宜逐步减仓`);
+  if (isNormal(returnDiff.prevStatus) && isCold(returnDiff.status)) alerts.push(`❄️ 红利进入过冷区（收益差 ${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%），宜逢低加仓`);
+  if (isNormal(bondWeather.prevStatus) && isHot(bondWeather.status)) alerts.push(`🔥 债市进入高估区（温度 ${bondWeather.temperature}℃），建议适时止盈`);
+  if (isNormal(bondWeather.prevStatus) && isCold(bondWeather.status)) alerts.push(`❄️ 债市进入低估区（温度 ${bondWeather.temperature}℃），适合买入`);
+  if (isNormal(thermometer.prevStatus) && isHot(thermometer.status)) alerts.push(`🔥 基金温度进入高温区（${thermometer.temperature}℃），暂停定投，及时止盈`);
+  if (isNormal(thermometer.prevStatus) && isCold(thermometer.status)) alerts.push(`❄️ 基金温度进入低温区（${thermometer.temperature}℃），加倍定投`);
+
+  if (alerts.length > 0) {
+    const alertContent = alerts.join('\n\n');
+    const alertMsgId = await sendMessage(chatId, 'interactive', JSON.stringify({
+      header: { title: { tag: 'plain_text', content: '⚠️ 市场极端信号' }, template: 'red' },
+      elements: [{ tag: 'markdown', content: alertContent }],
+    }));
+    if (alertMsgId) {
+      await urgentApp(alertMsgId);
+    }
   }
 }

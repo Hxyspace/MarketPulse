@@ -72,10 +72,10 @@ export function isPastUpdateTime(): boolean {
 }
 
 /**
- * 判断当前时间是否已过数据更新（20:00北京时间，数据源通常在晚间更新完毕）
+ * 判断当前时间是否已过数据更新（18:00北京时间，数据源通常在晚间更新完毕）
  */
 export function isPastDataUpdate(): boolean {
-  return getBeijingHour() >= 20;
+  return getBeijingHour() >= 18;
 }
 
 /**
@@ -93,9 +93,9 @@ export function isTradingDay(dateStr: string): boolean {
 export function getLatestTradingDate(): string {
   const now = new Date();
   const bjHour = getBeijingHour();
-  // 晚上8点前，最新可用数据是前一天的（数据源通常晚间更新）
+  // 晚上6点前，最新可用数据是前一天的（数据源通常晚间更新）
   let d = new Date(now.toISOString().split('T')[0] + 'T00:00:00Z');
-  if (bjHour < 20) {
+  if (bjHour < 18) {
     d.setUTCDate(d.getUTCDate() - 1);
   }
   // 回退到最近的工作日

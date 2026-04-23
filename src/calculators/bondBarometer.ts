@@ -164,3 +164,14 @@ export async function getBondByDate(queryDate: string): Promise<{
     temperature,
   };
 }
+
+/**
+ * 获取前一交易日的债市温度状态（用于极端信号检测）
+ */
+export function getPrevBondStatus(result: BondBarometerResult): string {
+  const allHistory = result.history;
+  if (allHistory.length < 2) return '';
+  const prevData = allHistory[allHistory.length - 2];
+  const prevTemp = calculateBondTemperature(allHistory.slice(0, -1), prevData.value);
+  return prevTemp.status;
+}
