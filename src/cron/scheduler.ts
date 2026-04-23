@@ -42,6 +42,9 @@ export function startScheduler() {
           bondYield: thermometer.bondYield,
           erp: thermometer.erp,
         },
+        diffHistory: returnDiff.history.map(h => ({ date: h.date, diff: h.diff })),
+        bondHistory: bondBarometer.history.map(h => ({ date: h.date, value: h.value })),
+        erpHistory: thermometer.erpHistory.map(h => ({ date: h.date, erp: h.erp, close: h.close })),
       });
 
       console.log('[Cron] Daily report sent successfully');

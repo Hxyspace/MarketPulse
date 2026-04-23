@@ -1,5 +1,6 @@
 import * as https from 'https';
 import { CONFIG } from '../config';
+import { generateReportImage, ReportData } from './reportImage';
 import { generateDashboardImage, DashboardData } from './dashboardImage';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
@@ -154,6 +155,9 @@ export async function sendDailyReport(data: {
   returnDiff: { date: string; diff: number; compass: string; divReturn: number; allReturn: number };
   bondWeather: { date: string; weather: string; value: number; change: number; temperature: number };
   thermometer: { date: string; temperature: number; status: string; pe: number; bondYield: number; erp: number };
+  diffHistory?: { date: string; diff: number }[];
+  bondHistory?: { date: string; value: number }[];
+  erpHistory?: { date: string; erp: number; close: number }[];
 }): Promise<void> {
   const { chatId } = CONFIG.feishu;
   if (!chatId) {
@@ -163,32 +167,26 @@ export async function sendDailyReport(data: {
 
   const { returnDiff, bondWeather, thermometer } = data;
 
-  // 生成Dashboard图并上传
-  let imageKey: string | null = null;
+  // 1) 生成简报图（3个gauge卡片）嵌入卡片消息
+  let reportImageKey: string | null = null;
   try {
-    const dashData: DashboardData = {
+    const reportData: ReportData = {
       date: returnDiff.date,
-      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
+      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass },
       bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
       thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
     };
-    const imageBuf = await generateDashboardImage(dashData);
-    imageKey = await uploadImage(imageBuf);
+    const buf = await generateReportImage(reportData);
+    reportImageKey = await uploadImage(buf);
   } catch (err) {
-    console.error('[Feishu] Dashboard image generation failed:', err instanceof Error ? err.message : err);
+    console.error('[Feishu] Report image failed:', err instanceof Error ? err.message : err);
   }
 
-  // 构建卡片消息
+  // Card message with report image
   const elements: any[] = [];
-
-  if (imageKey) {
-    elements.push({
-      tag: 'img',
-      img_key: imageKey,
-      alt: { tag: 'plain_text', content: '市场速报' },
-    });
+  if (reportImageKey) {
+    elements.push({ tag: 'img', img_key: reportImageKey, alt: { tag: 'plain_text', content: '市场速报' } });
   } else {
-    // fallback: 纯文本
     elements.push({ tag: 'markdown', content: [
       `**01 红利罗盘 · ${returnDiff.compass}**`,
       `收益差：${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%`,
@@ -201,17 +199,29 @@ export async function sendDailyReport(data: {
       `PE ${thermometer.pe} | 国债 ${thermometer.bondYield}% | ERP ${thermometer.erp}%`,
     ].join('\n') });
   }
-
   elements.push({ tag: 'hr' });
   elements.push({ tag: 'markdown', content: `📈 [Dashboard](http://localhost:${CONFIG.port})` });
 
-  const card = {
-    header: {
-      title: { tag: 'plain_text', content: `📊 市场速报 ${returnDiff.date}` },
-      template: 'blue',
-    },
+  await sendMessage(chatId, 'interactive', JSON.stringify({
+    header: { title: { tag: 'plain_text', content: `📊 市场速报 ${returnDiff.date}` }, template: 'blue' },
     elements,
-  };
+  }));
 
-  await sendMessage(chatId, 'interactive', JSON.stringify(card));
+  // 2) 生成完整Dashboard图（带走势图）单独发送
+  try {
+    const dashData: DashboardData = {
+      date: returnDiff.date,
+      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
+      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
+      thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
+      diffHistory: data.diffHistory,
+      bondHistory: data.bondHistory,
+      erpHistory: data.erpHistory,
+    };
+    const dashBuf = await generateDashboardImage(dashData);
+    const dashImageKey = await uploadImage(dashBuf);
+    await sendImageMessage(chatId, dashImageKey);
+  } catch (err) {
+    console.error('[Feishu] Dashboard image failed:', err instanceof Error ? err.message : err);
+  }
 }

@@ -6,10 +6,14 @@ export interface DashboardData {
   returnDiff: { diff: number; compass: string; divReturn: number; allReturn: number };
   bondWeather: { weather: string; value: number; change: number; temperature: number };
   thermometer: { temperature: number; status: string; pe: number; bondYield: number; erp: number };
+  // Optional chart histories
+  diffHistory?: { date: string; diff: number }[];
+  bondHistory?: { date: string; value: number }[];
+  erpHistory?: { date: string; erp: number; close: number }[];
 }
 
 const W = 800;
-const H = 1000;
+// H is calculated dynamically based on content
 
 // Win11 Mica light theme
 const ACCENT = '#0067c0';
@@ -118,7 +122,7 @@ function renderGaugeToBuffer(value: number, min: number, max: number, accentColo
         fontSize: 22,
         fontWeight: 'bold' as const,
         color: TEXT,
-        offsetCenter: [0, '70%'],
+        offsetCenter: [0, '58%'],
       },
       title: { show: false },
       data: [{ value }],
@@ -130,7 +134,99 @@ function renderGaugeToBuffer(value: number, min: number, max: number, accentColo
   return buf;
 }
 
+function renderLineChartToBuffer(
+  chartW: number, chartH: number,
+  series: { name: string; data: [string, number][]; color: string; yAxisIndex?: number }[],
+  options?: { dualAxis?: boolean; markLines?: { value: number; color: string; label: string }[]; startIdx?: number },
+): Buffer {
+  const canvas = createCanvas(chartW, chartH);
+  const chart = echarts.init(canvas as any);
+
+  const yAxis: any[] = [{
+    type: 'value',
+    scale: true,
+    splitLine: { lineStyle: { color: '#f0eeeb', type: 'dashed' } },
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { fontSize: 10, color: TEXT_DIM },
+  }];
+
+  if (options?.dualAxis) {
+    yAxis.push({
+      type: 'value',
+      scale: true,
+      splitLine: { show: false },
+      axisLine: { show: false },
+      axisTick: { show: false },
+      axisLabel: { fontSize: 10, color: TEXT_DIM },
+    });
+  }
+
+  const startPct = options?.startIdx != null
+    ? Math.max(0, Math.round((1 - options.startIdx / (series[0]?.data.length || 1)) * 100))
+    : 0;
+
+  const seriesConfig = series.map(s => ({
+    name: s.name,
+    type: 'line' as const,
+    data: s.data,
+    yAxisIndex: s.yAxisIndex || 0,
+    smooth: 0.3,
+    symbol: 'none',
+    lineStyle: { width: 1.5, color: s.color, opacity: s.yAxisIndex ? 0.6 : 1 },
+    itemStyle: { color: s.color },
+    areaStyle: s.yAxisIndex ? undefined : { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+      { offset: 0, color: s.color + '2e' },
+      { offset: 1, color: s.color + '03' },
+    ]) },
+  }));
+
+  const markLineData = (options?.markLines || []).map(ml => ({
+    yAxis: ml.value,
+    lineStyle: { color: ml.color, type: 'dashed' as const, width: 1 },
+    label: { formatter: ml.label, fontSize: 9, color: ml.color, position: 'insideEndTop' as const },
+  }));
+
+  if (markLineData.length > 0 && seriesConfig.length > 0) {
+    (seriesConfig[0] as any).markLine = {
+      silent: true,
+      symbol: 'none',
+      data: markLineData,
+    };
+  }
+
+  chart.setOption({
+    animation: false,
+    grid: { left: 50, right: options?.dualAxis ? 50 : 20, top: series.length > 1 ? 36 : 20, bottom: 28 },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      axisLine: { lineStyle: { color: '#e0ddd8' } },
+      axisTick: { show: false },
+      axisLabel: { fontSize: 9, color: TEXT_DIM },
+    },
+    yAxis,
+    legend: series.length > 1 ? {
+      top: 4, right: 0,
+      textStyle: { fontSize: 10, color: TEXT_SEC },
+      itemWidth: 14, itemHeight: 2,
+    } : undefined,
+    dataZoom: [{ type: 'inside', start: startPct, end: 100 }],
+    series: seriesConfig,
+  });
+
+  const buf = (canvas as unknown as { toBuffer(mime: string): Buffer }).toBuffer('image/png');
+  chart.dispose();
+  return buf;
+}
+
 export async function generateDashboardImage(data: DashboardData): Promise<Buffer> {
+  // Calculate height dynamically
+  const chartH = 280;
+  const hasCharts = !!(data.diffHistory || data.bondHistory || data.erpHistory);
+  const chartCount = [data.diffHistory, data.bondHistory, data.erpHistory].filter(Boolean).length;
+  const H = 1000 + (hasCharts ? chartCount * (chartH + 50) : 0);
+
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
@@ -316,7 +412,29 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.fillStyle = GREEN; ctx.fillText('<-1%', rx, ry); rx += ctx.measureText('<-1%').width;
   ctx.fillStyle = TEXT_DIM; ctx.fillText(' 过冷·加仓', rx, ry);
 
-  sectionY += cardH1 + 28;
+  sectionY += cardH1 + 24;
+
+  // Chart: 40日收益差走势
+  if (data.diffHistory && data.diffHistory.length > 0) {
+    drawSectionHeader(sectionY, '—', '40日收益差走势', '2020 至今');
+    sectionY += 30;
+    const chartBuf = renderLineChartToBuffer(cardW, chartH, [{
+      name: '收益差',
+      data: data.diffHistory.map(d => [d.date, d.diff]),
+      color: ACCENT,
+    }], {
+      startIdx: 730,
+      markLines: [
+        { value: 10, color: RED, label: '+10%' },
+        { value: -1, color: GREEN, label: '-1%' },
+        { value: 0, color: TEXT_DIM, label: '0' },
+      ],
+    });
+    const chartImg = await loadImage(chartBuf);
+    drawCard(ctx, cardX, sectionY, cardW, chartH + 16);
+    ctx.drawImage(chartImg, cardX, sectionY + 8, cardW, chartH);
+    sectionY += chartH + 16 + 24;
+  }
 
   // ── Section 02: 债市晴雨表 ──
   drawSectionHeader(sectionY, '02', '债市晴雨表', '中债新综合净价 · 5年百分位温度');
@@ -376,7 +494,22 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.fillStyle = GREEN; ctx.fillText('<30℃', rx2, ry2); rx2 += ctx.measureText('<30℃').width;
   ctx.fillStyle = TEXT_DIM; ctx.fillText(' 偏冷', rx2, ry2);
 
-  sectionY += cardH2 + 28;
+  sectionY += cardH2 + 24;
+
+  // Chart: 中债新综合净价指数走势
+  if (data.bondHistory && data.bondHistory.length > 0) {
+    drawSectionHeader(sectionY, '—', '中债新综合净价指数', '2002 至今');
+    sectionY += 30;
+    const chartBuf = renderLineChartToBuffer(cardW, chartH, [{
+      name: '净价指数',
+      data: data.bondHistory.map(d => [d.date, d.value]),
+      color: GREEN,
+    }]);
+    const chartImg = await loadImage(chartBuf);
+    drawCard(ctx, cardX, sectionY, cardW, chartH + 16);
+    ctx.drawImage(chartImg, cardX, sectionY + 8, cardW, chartH);
+    sectionY += chartH + 16 + 24;
+  }
 
   // ── Section 03: 基金温度计 ──
   drawSectionHeader(sectionY, '03', '基金温度计', '沪深300 ERP · 股债利差');
@@ -435,7 +568,30 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.fillStyle = GREEN; ctx.fillText('<30℃', rx3, ry3); rx3 += ctx.measureText('<30℃').width;
   ctx.fillStyle = TEXT_DIM; ctx.fillText(' 加仓', rx3, ry3);
 
-  sectionY += cardH3 + 20;
+  sectionY += cardH3 + 24;
+
+  // Chart: 沪深300 股债利差
+  if (data.erpHistory && data.erpHistory.length > 0) {
+    drawSectionHeader(sectionY, '—', '沪深300 股债利差', 'ERP vs CSI 300');
+    sectionY += 30;
+    const chartBuf = renderLineChartToBuffer(cardW, chartH, [
+      {
+        name: 'ERP',
+        data: data.erpHistory.map(d => [d.date, d.erp]),
+        color: AMBER,
+      },
+      {
+        name: 'CSI 300',
+        data: data.erpHistory.map(d => [d.date, d.close]),
+        color: BLUE,
+        yAxisIndex: 1,
+      },
+    ], { dualAxis: true, startIdx: 750 });
+    const chartImg = await loadImage(chartBuf);
+    drawCard(ctx, cardX, sectionY, cardW, chartH + 16);
+    ctx.drawImage(chartImg, cardX, sectionY + 8, cardW, chartH);
+    sectionY += chartH + 16 + 24;
+  }
 
   // Footer
   ctx.fillStyle = TEXT_DIM;
