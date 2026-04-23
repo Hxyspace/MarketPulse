@@ -152,7 +152,7 @@ export async function sendFeishuMessage(title: string, content: string): Promise
 }
 
 export async function sendDailyReport(data: {
-  returnDiff: { date: string; diff: number; compass: string; divReturn: number; allReturn: number };
+  returnDiff: { date: string; diff: number; status: string; divReturn: number; allReturn: number };
   bondWeather: { date: string; weather: string; value: number; change: number; temperature: number };
   thermometer: { date: string; temperature: number; status: string; pe: number; bondYield: number; erp: number };
   diffHistory?: { date: string; diff: number }[];
@@ -172,7 +172,7 @@ export async function sendDailyReport(data: {
   try {
     const reportData: ReportData = {
       date: returnDiff.date,
-      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass },
+      returnDiff: { diff: returnDiff.diff, status: returnDiff.status },
       bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
       thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
     };
@@ -188,7 +188,7 @@ export async function sendDailyReport(data: {
     elements.push({ tag: 'img', img_key: reportImageKey, alt: { tag: 'plain_text', content: '市场速报' } });
   } else {
     elements.push({ tag: 'markdown', content: [
-      `**01 红利罗盘 · ${returnDiff.compass}**`,
+      `**01 红利罗盘 · ${returnDiff.status}**`,
       `收益差：${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%`,
       '',
       `**02 债市晴雨表 · ${bondWeather.weather}**`,
@@ -211,7 +211,7 @@ export async function sendDailyReport(data: {
   try {
     const dashData: DashboardData = {
       date: returnDiff.date,
-      returnDiff: { diff: returnDiff.diff, compass: returnDiff.compass, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
+      returnDiff: { diff: returnDiff.diff, status: returnDiff.status, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
       bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature },
       thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
       diffHistory: data.diffHistory,

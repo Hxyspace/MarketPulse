@@ -61,13 +61,13 @@ function calculateBondTemperature(allData: BondIndexData[], currentValue: number
   let interpretation: string;
 
   if (temperature >= 80) {
-    status = '🔥 高温区';
+    status = '🔥 高估';
     interpretation = '债市高估，有回撤风险，建议适时止盈，不宜大笔加仓';
   } else if (temperature >= 30) {
-    status = '😊 正常区';
+    status = '😊 适中';
     interpretation = '债市估值适中，可安心定投持有';
   } else {
-    status = '❄️ 低温区';
+    status = '❄️ 低估';
     interpretation = '债市低估，性价比高，适合单笔买入或定投';
   }
 

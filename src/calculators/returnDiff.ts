@@ -6,7 +6,8 @@ export interface ReturnDiffResult {
   dividendReturn40d: number;  // 红利低波40日收益率 %
   allShareReturn40d: number;  // 中证全指40日收益率 %
   diff: number;               // 40日收益差 %
-  compass: string;            // 罗盘状态
+  status: string;             // 罗盘状态
+  interpretation: string;     // 操作建议
 }
 
 export interface ReturnDiffHistory {
@@ -54,7 +55,8 @@ export function calculate40DayReturnDiff(
       dividendReturn40d: Math.round(dividendReturn * 100) / 100,
       allShareReturn40d: Math.round(allShareReturn * 100) / 100,
       diff: Math.round(diff * 100) / 100,
-      compass: getCompassStatus(diff),
+      status: getCompassStatus(diff),
+      interpretation: getCompassInterpretation(diff),
     });
   }
 
@@ -63,9 +65,16 @@ export function calculate40DayReturnDiff(
 
 function getCompassStatus(diff: number): string {
   const t = CONFIG.returnDiff.thresholds;
-  if (diff >= t.overheated) return '过热';
-  if (diff >= t.normal) return '正常';
-  return '过冷';
+  if (diff >= t.overheated) return '🔥 过热';
+  if (diff >= t.normal) return '😊 适中';
+  return '❄️ 过冷';
+}
+
+function getCompassInterpretation(diff: number): string {
+  const t = CONFIG.returnDiff.thresholds;
+  if (diff >= t.overheated) return '红利类资产热度过热，宜逐步减仓';
+  if (diff >= t.normal) return '红利类资产热度适中，宜持有收益';
+  return '红利类资产过冷，宜逢低加仓';
 }
 
 /**

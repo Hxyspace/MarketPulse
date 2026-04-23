@@ -23,7 +23,7 @@ export function startScheduler() {
         returnDiff: {
           date: returnDiff.latest.date,
           diff: returnDiff.latest.diff,
-          compass: returnDiff.latest.compass,
+          status: returnDiff.latest.status,
           divReturn: returnDiff.latest.dividendReturn40d,
           allReturn: returnDiff.latest.allShareReturn40d,
         },

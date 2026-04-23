@@ -3,7 +3,7 @@ import * as echarts from 'echarts';
 
 export interface DashboardData {
   date: string;
-  returnDiff: { diff: number; compass: string; divReturn: number; allReturn: number };
+  returnDiff: { diff: number; status: string; divReturn: number; allReturn: number };
   bondWeather: { weather: string; value: number; change: number; temperature: number };
   thermometer: { temperature: number; status: string; pe: number; bondYield: number; erp: number };
   // Optional chart histories
@@ -270,7 +270,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
       label: '红利罗盘 · 40日收益差',
       value: `${data.returnDiff.diff > 0 ? '+' : ''}${data.returnDiff.diff}%`,
       valueColor: diffColor(data.returnDiff.diff),
-      sub: data.returnDiff.compass,
+      sub: data.returnDiff.status,
       accent: [ACCENT, '#62b5f6'],
       tint: 'rgba(0,103,192,0.02)',
     },
@@ -379,7 +379,7 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
 
   ctx.fillStyle = diffColor(data.returnDiff.diff);
   ctx.font = '700 20px "Segoe UI", "Microsoft YaHei", sans-serif';
-  ctx.fillText(data.returnDiff.compass, detailX, detailY);
+  ctx.fillText(data.returnDiff.status, detailX, detailY);
 
   ctx.fillStyle = TEXT_SEC;
   ctx.font = '13px "Segoe UI", "Microsoft YaHei", sans-serif';

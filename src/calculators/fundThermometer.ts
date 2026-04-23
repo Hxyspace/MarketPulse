@@ -11,6 +11,7 @@ export interface FundThermometerResult {
   date: string;
   temperature: number;      // 温度 ℃
   status: string;           // 状态描述
+  interpretation: string;   // 操作建议
   csi300Close: number;      // 沪深300收盘价
   csi300Change: number;     // 沪深300涨跌幅
   pe: number;               // 沪深300市盈率
@@ -107,6 +108,7 @@ export async function getFundThermometer(): Promise<FundThermometerResult> {
     date: latest.date,
     temperature,
     status: getTemperatureStatus(temperature),
+    interpretation: getTemperatureInterpretation(temperature),
     csi300Close: latest.close,
     csi300Change: latest.changePercent || Math.round((latest.close / prev.close - 1) * 10000) / 100,
     pe: Math.round(latest.pe * 100) / 100,
@@ -118,9 +120,15 @@ export async function getFundThermometer(): Promise<FundThermometerResult> {
 }
 
 function getTemperatureStatus(temp: number): string {
-  if (temp >= 80) return '🔥 高温区 - 市场过热，暂停定投，及时止盈';
-  if (temp >= 31) return '😊 正常区 - 市场正常，按计划定投';
-  return '❄️ 低温区 - 市场低估，加倍定投';
+  if (temp >= 80) return '🔥 高温区';
+  if (temp >= 31) return '😊 正常区';
+  return '❄️ 低温区';
+}
+
+function getTemperatureInterpretation(temp: number): string {
+  if (temp >= 80) return '市场过热，暂停定投，及时止盈';
+  if (temp >= 31) return '市场正常，按计划定投';
+  return '市场低估，加倍定投';
 }
 
 /**
@@ -153,6 +161,7 @@ export async function getFundThermometerByDate(queryDate: string): Promise<FundT
     date: latest.date,
     temperature,
     status: getTemperatureStatus(temperature),
+    interpretation: getTemperatureInterpretation(temperature),
     csi300Close: latest.close,
     csi300Change: latest.changePercent || Math.round((latest.close / prev.close - 1) * 10000) / 100,
     pe: Math.round(latest.pe * 100) / 100,

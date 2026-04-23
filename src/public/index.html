@@ -609,6 +609,11 @@
         <div class="compass-detail">
           <div class="compass-status val-blue" id="bond-thermo-status">—</div>
           <div class="compass-meta" id="bond-thermo-detail">加载中...</div>
+          <div class="compass-rule">
+            <span class="r">&gt;80℃</span> 高估·止盈 &nbsp;│&nbsp;
+            <span class="y">30~80℃</span> 正常·持有 &nbsp;│&nbsp;
+            <span class="g">&lt;30℃</span> 低估·买入
+          </div>
         </div>
       </div>
       <div class="weather-section">
@@ -647,6 +652,11 @@
         <div class="compass-detail">
           <div class="compass-status val-warm" id="thermo-status">—</div>
           <div class="compass-meta" id="thermo-detail">加载中...</div>
+          <div class="compass-rule">
+            <span class="r">&gt;80℃</span> 过热·止盈 &nbsp;│&nbsp;
+            <span class="y">31~80℃</span> 正常·定投 &nbsp;│&nbsp;
+            <span class="g">&le;30℃</span> 低估·加倍
+          </div>
         </div>
       </div>
     </div>
@@ -882,19 +892,20 @@ async function loadReturnDiff() {
     var el = document.getElementById('diff-value');
     el.textContent = (latest.diff > 0 ? '+' : '') + latest.diff + '%';
     el.className = 'indicator-value ' + diffClass(latest.diff);
-    document.getElementById('diff-status').textContent = latest.compass + ' · ' + latest.date;
+    document.getElementById('diff-status').textContent = latest.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim() + ' · ' + latest.date;
 
-    renderGauge(document.getElementById('compassChart'), latest.diff, latest.compass, {
+    renderGauge(document.getElementById('compassChart'), latest.diff, latest.status.replace(/[\u{1F300}-\u{1F9FF}]/gu, '').trim(), {
       min: -15, max: 15, unit: '%', splitNumber: 6,
       zones: [[0.467, C.green], [0.7, C.amber], [1, C.red]],
     });
 
-    document.getElementById('compass-status').textContent = latest.compass;
+    document.getElementById('compass-status').textContent = latest.diff + '% · ' + latest.status;
     document.getElementById('compass-status').className = 'compass-status ' + diffClass(latest.diff);
     document.getElementById('compass-detail').innerHTML =
-      '截止 <strong>' + latest.date + '</strong>，红利低波相对中证全指 40日收益差：<strong>' + (latest.diff > 0 ? '+' : '') + latest.diff + '%</strong><br>' +
+      '红利低波相对中证全指 40日收益差：<strong>' + (latest.diff > 0 ? '+' : '') + latest.diff + '%</strong><br>' +
       '红利低波 40d：' + (latest.dividendReturn40d > 0 ? '+' : '') + latest.dividendReturn40d + '%<br>' +
-      '中证全指 40d：' + (latest.allShareReturn40d > 0 ? '+' : '') + latest.allShareReturn40d + '%';
+      '中证全指 40d：' + (latest.allShareReturn40d > 0 ? '+' : '') + latest.allShareReturn40d + '%<br><br>' +
+      '<strong>' + latest.interpretation + '</strong>';
 
     renderDiffHistory(history);
   } catch (err) {
@@ -962,8 +973,7 @@ async function loadBondBarometer() {
       '中债新综合净价指数：<strong>' + latest.value.toFixed(4) + '</strong><br>' +
       '较前日变动：' + (latest.change > 0 ? '+' : '') + latest.change + '<br>' +
       '5年百分位：' + temperature.percentile + '%<br><br>' +
-      '<strong>' + temperature.interpretation + '</strong><br><br>' +
-      '<span style="color:var(--text-dim);font-size:12px">&lt;30℃ 低估 · 30-80℃ 正常 · &gt;80℃ 高估</span>';
+      '<strong>' + temperature.interpretation + '</strong>';
 
     renderBondHistory(data.history);
     renderWeatherGrid(data.recentDays);
@@ -1030,8 +1040,7 @@ async function loadFundThermometer() {
       '沪深300 PE：' + (data.pe || '—') + '<br>' +
       '10年国债收益率：' + (data.bondYield ? data.bondYield + '%' : '—') + '<br>' +
       '股债利差 ERP：' + (data.erp != null ? data.erp + '%' : '—') + '<br><br>' +
-      '<strong>' + data.status + '</strong><br><br>' +
-      '<span style="color:var(--text-dim);font-size:12px">ERP = 1/PE − 10Y Bond · ≤30℃ 低估 · 31-80℃ 正常 · &gt;80℃ 过热</span>';
+      '<strong>' + data.interpretation + '</strong>';
 
     if (data.erpHistory && data.erpHistory.length) {
       renderErpHistory(data.erpHistory);

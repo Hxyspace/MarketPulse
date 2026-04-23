@@ -3,7 +3,7 @@ import * as echarts from 'echarts';
 
 export interface ReportData {
   date: string;
-  returnDiff: { diff: number; compass: string };
+  returnDiff: { diff: number; status: string };
   bondWeather: { weather: string; value: number; change: number; temperature: number };
   thermometer: { temperature: number; status: string; pe: number; bondYield: number; erp: number };
 }
@@ -160,7 +160,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
       label: '红利罗盘',
       value: `${data.returnDiff.diff > 0 ? '+' : ''}${data.returnDiff.diff}%`,
       valueColor: diffColor(data.returnDiff.diff),
-      status: data.returnDiff.compass,
+      status: data.returnDiff.status,
       detail: `40日收益差`,
       gaugeValue: data.returnDiff.diff,
       gaugeMin: -15,
