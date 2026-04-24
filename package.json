@@ -1,11 +1,19 @@
 {
-  "name": "money-dashboard",
-  "version": "1.0.0",
-  "description": "红利低波40日收益差 + 债市晴雨表 + 基金温度计 Dashboard",
+  "name": "market-pulse",
+  "version": "0.1.0",
+  "description": "量化市场监控面板 — 红利罗盘 + 债市晴雨表 + 基金温度计",
   "main": "dist/index.js",
+  "bin": {
+    "market-pulse": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    ".env.example"
+  ],
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
+    "postbuild": "node -e \"const fs=require('fs');fs.cpSync('src/public','dist/public',{recursive:true});fs.cpSync('src/data','dist/data',{recursive:true})\"",
     "start": "node dist/index.js"
   },
   "dependencies": {
