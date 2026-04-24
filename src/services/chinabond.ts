@@ -1,6 +1,6 @@
 import * as https from 'https';
 import { CONFIG } from '../config';
-import { loadLocalData, saveLocalData, needsUpdate } from './storage';
+import { loadLocalData, saveLocalData, needsUpdate, getLatestTradingDate } from './storage';
 
 export interface BondIndexData {
   date: string;   // YYYY-MM-DD
@@ -12,7 +12,7 @@ const STORAGE_KEY = 'chinabond_net_price.json';
 /**
  * 从中债信息网获取中债新综合净价指数全量历史数据（2002年至今）
  */
-async function fetchFromApi(): Promise<BondIndexData[]> {
+async function fetchChinabondFromApi(): Promise<BondIndexData[]> {
   console.log('[Chinabond] Fetching full history from API...');
   const bodyStr = new URLSearchParams({
     indexid: CONFIG.chinabond.indexId,
@@ -77,41 +77,58 @@ async function fetchFromApi(): Promise<BondIndexData[]> {
 }
 
 /**
- * 获取中债净价指数数据（带本地缓存）
- * 中债API返回全量数据，每天只需要拉一次
+ * 获取指定日期范围的中债净价指数（内部全量拉取，返回截取范围）
  */
-export async function fetchChinabondNetPriceIndex(): Promise<BondIndexData[]> {
+async function fetchBondIndexByRange(startDate: string, endDate: string): Promise<BondIndexData[]> {
+  console.log(`[Chinabond] Fetching ${startDate} to ${endDate}...`);
+  const allData = await fetchChinabondFromApi();
+  return allData.filter(d => d.date >= startDate && d.date <= endDate);
+}
+
+/**
+ * 获取中债净价指数数据（带本地缓存，增量合并保存）
+ */
+async function getChinabondData(): Promise<BondIndexData[]> {
   const stored = loadLocalData<BondIndexData>(STORAGE_KEY);
 
   if (stored && stored.items.length > 0) {
     const lastDate = stored.items[stored.items.length - 1].date;
 
-    // 如果本地数据已覆盖到最近交易日，直接返回
     if (!needsUpdate(lastDate)) {
       console.log(`[Storage] ${STORAGE_KEY}: up-to-date (${stored.items.length} items, last: ${lastDate})`);
       return stored.items;
     }
+
+    // 增量更新：从最后日期开始拉取新数据
+    const endDate = getLatestTradingDate();
+    try {
+      const newData = await fetchBondIndexByRange(lastDate, endDate);
+      if (newData.length > 0) {
+        const dateSet = new Set(stored.items.map(d => d.date));
+        const deduped = newData.filter(d => !dateSet.has(d.date));
+        const merged = [...stored.items, ...deduped].sort((a, b) => a.date.localeCompare(b.date));
+        saveLocalData(STORAGE_KEY, merged);
+        console.log(`[Storage] ${STORAGE_KEY}: updated to ${merged.length} items (+${deduped.length} new)`);
+        return merged;
+      } else {
+        console.warn(`[Chinabond] No new data returned for ${lastDate} to ${endDate}`);
+      }
+    } catch (err) {
+      console.warn('[Chinabond] Incremental update failed, using cached:', err instanceof Error ? err.message : err);
+    }
+    return stored.items;
   }
 
-  // 需要更新：中债API返回全量数据，直接替换
+  // 首次拉取全量
   try {
-    const freshData = await fetchFromApi();
+    const freshData = await fetchChinabondFromApi();
     if (freshData.length > 0) {
       saveLocalData(STORAGE_KEY, freshData);
-      // 检查是否包含期望的最新日期
-      const lastFetched = freshData[freshData.length - 1].date;
-      if (stored && stored.items.length > 0) {
-        const lastStored = stored.items[stored.items.length - 1].date;
-        if (lastFetched <= lastStored) {
-          console.warn(`[Chinabond] API data not updated yet (latest: ${lastFetched}, expected newer than: ${lastStored})`);
-        }
-      }
     }
     return freshData;
   } catch (err) {
-    // 如果API失败但有本地数据，用本地数据
     if (stored && stored.items.length > 0) {
-      console.warn(`[Chinabond] API failed, using cached data (${stored.items.length} items, last: ${stored.items[stored.items.length - 1].date}):`, err instanceof Error ? err.message : err);
+      console.warn('[Chinabond] API failed, using cached data:', err);
       return stored.items;
     }
     throw err;
@@ -119,10 +136,18 @@ export async function fetchChinabondNetPriceIndex(): Promise<BondIndexData[]> {
 }
 
 /**
+ * 获取指定日期范围的中债净价指数数据
+ */
+export async function getBondDataByRange(startDate: string, endDate: string): Promise<BondIndexData[]> {
+  const allData = await getChinabondData();
+  return allData.filter(d => d.date >= startDate && d.date <= endDate);
+}
+
+/**
  * 获取最近N天的中债净价指数数据
  */
 export async function getRecentBondData(days: number = 365): Promise<BondIndexData[]> {
-  const allData = await fetchChinabondNetPriceIndex();
+  const allData = await getChinabondData();
   return allData.slice(-days);
 }
 
@@ -130,5 +155,5 @@ export async function getRecentBondData(days: number = 365): Promise<BondIndexDa
  * 获取全部中债净价指数数据（2002年至今）
  */
 export async function getAllBondData(): Promise<BondIndexData[]> {
-  return fetchChinabondNetPriceIndex();
+  return getChinabondData();
 }
