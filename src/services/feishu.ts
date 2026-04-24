@@ -225,8 +225,10 @@ export async function sendDailyReport(data: {
       `PE ${thermometer.pe} | 国债 ${thermometer.bondYield}% | ERP ${thermometer.erp}%`,
     ].join('\n') });
   }
+  const dashUrl = `http://localhost:${CONFIG.port}`;
+  const appLink = `https://applink.feishu.cn/client/web_url/open?mode=appCenter&url=${encodeURIComponent(dashUrl)}`;
   elements.push({ tag: 'hr' });
-  elements.push({ tag: 'markdown', content: `📈 [Dashboard](http://localhost:${CONFIG.port})` });
+  elements.push({ tag: 'markdown', content: `📈 [Dashboard](${appLink})` });
 
   await sendMessage(chatId, 'interactive', JSON.stringify({
     header: { title: { tag: 'plain_text', content: `📊 市场速报 ${returnDiff.date}` }, template: 'blue' },

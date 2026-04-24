@@ -9,7 +9,7 @@ export interface ReportData {
 }
 
 const W = 800;
-const H = 520;
+const H = 460;
 
 // Win11 Mica light theme
 const BG = '#f5f3f0';
@@ -272,6 +272,13 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
   ctx.textAlign = 'center';
   ctx.fillText('Market Pulse · Auto-generated daily report', W / 2, H - 16);
   ctx.textAlign = 'left';
+
+  // Round corners
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, H, 20);
+  ctx.fill();
 
   return canvas.toBuffer('image/png');
 }

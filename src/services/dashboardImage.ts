@@ -225,7 +225,8 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   const chartH = 280;
   const hasCharts = !!(data.diffHistory || data.bondHistory || data.erpHistory);
   const chartCount = [data.diffHistory, data.bondHistory, data.erpHistory].filter(Boolean).length;
-  const H = 1000 + (hasCharts ? chartCount * (chartH + 50) : 0);
+  const hasFooter = true;
+  const H = 1000 + (hasCharts ? chartCount * (chartH + 50) : 0) + (hasFooter ? 50 : 0);
 
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
@@ -594,11 +595,20 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   }
 
   // Footer
-  ctx.fillStyle = TEXT_DIM;
-  ctx.font = '11px "Cascadia Code", "Consolas", monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('Market Pulse · Auto-generated daily report', W / 2, sectionY + 10);
-  ctx.textAlign = 'left';
+  if (hasFooter) {
+    ctx.fillStyle = TEXT_DIM;
+    ctx.font = '11px "Cascadia Code", "Consolas", monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('Market Pulse · Auto-generated daily report', W / 2, H - 16);
+    ctx.textAlign = 'left';
+  }
+
+  // Round corners
+  ctx.globalCompositeOperation = 'destination-in';
+  ctx.fillStyle = '#000';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, W, H, 20);
+  ctx.fill();
 
   return canvas.toBuffer('image/png');
 }
