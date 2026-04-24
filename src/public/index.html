@@ -572,9 +572,9 @@
           <div class="compass-status val-gold" id="compass-status">—</div>
           <div class="compass-meta" id="compass-detail">加载中...</div>
           <div class="compass-rule">
-            <span class="r">&gt;+10%</span> 过热·减仓 &nbsp;│&nbsp;
-            <span class="y">-1%~+10%</span> 正常·持有 &nbsp;│&nbsp;
-            <span class="g">&lt;-1%</span> 过冷·加仓
+            <span class="r">&gt; +10%</span> 过热·减仓 &nbsp;│&nbsp;
+            <span class="y">-1% ~ +10%</span> 正常·持有 &nbsp;│&nbsp;
+            <span class="g">&lt; -1%</span> 过冷·加仓
           </div>
         </div>
       </div>
@@ -900,7 +900,7 @@ async function loadReturnDiff() {
       zones: [[0.467, C.green], [0.7, C.amber], [1, C.red]],
     });
 
-    document.getElementById('compass-status').textContent = latest.diff + '% · ' + latest.status;
+    document.getElementById('compass-status').textContent = (latest.diff > 0 ? '+' : '') + latest.diff + '% · ' + latest.status;
     document.getElementById('compass-status').className = 'compass-status ' + diffClass(latest.diff);
     document.getElementById('compass-detail').innerHTML =
       '红利低波相对中证全指 40日收益差：<strong>' + (latest.diff > 0 ? '+' : '') + latest.diff + '%</strong><br>' +

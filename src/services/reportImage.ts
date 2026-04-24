@@ -60,7 +60,16 @@ function drawRoundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   ctx.closePath();
 }
 
-function renderGaugeToBuffer(value: number, min: number, max: number, color: string): Buffer {
+interface GaugeOptions {
+  unit?: string;
+  zones?: [number, string][];
+  splitNumber?: number;
+}
+
+function renderGaugeToBuffer(value: number, min: number, max: number, color: string, opts?: GaugeOptions): Buffer {
+  const unit = opts?.unit || '\u2103';
+  const zones = opts?.zones || [[0.3, GREEN], [0.8, AMBER], [1, RED]];
+  const splitNumber = opts?.splitNumber || 5;
   const size = 160;
   const canvas = createCanvas(size, size);
   const chart = echarts.init(canvas as any);
@@ -74,15 +83,11 @@ function renderGaugeToBuffer(value: number, min: number, max: number, color: str
       startAngle: 210,
       endAngle: -30,
       min, max,
-      splitNumber: 5,
+      splitNumber,
       axisLine: {
         lineStyle: {
           width: 14,
-          color: [
-            [0.3, GREEN],
-            [0.8, AMBER],
-            [1, RED],
-          ],
+          color: zones,
         },
       },
       pointer: {
@@ -95,7 +100,10 @@ function renderGaugeToBuffer(value: number, min: number, max: number, color: str
       splitLine: { show: false },
       axisLabel: { show: false },
       detail: {
-        formatter: (v: number) => v.toFixed(1),
+        formatter: (v: number) => {
+          const f = unit === '%' ? v.toFixed(2) : v.toFixed(1);
+          return f + unit;
+        },
         fontSize: 18,
         fontWeight: 'bold' as const,
         color: TEXT,
@@ -165,6 +173,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
       gaugeValue: data.returnDiff.diff,
       gaugeMin: -15,
       gaugeMax: 15,
+      gaugeOpts: { unit: '%', zones: [[0.467, GREEN], [0.833, AMBER], [1, RED]] as [number, string][], splitNumber: 6 },
     },
     {
       label: '债市晴雨表',
@@ -175,6 +184,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
       gaugeValue: data.bondWeather.temperature,
       gaugeMin: 0,
       gaugeMax: 100,
+      gaugeOpts: {} as GaugeOptions,
     },
     {
       label: '基金温度计',
@@ -185,6 +195,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
       gaugeValue: data.thermometer.temperature,
       gaugeMin: 0,
       gaugeMax: 100,
+      gaugeOpts: {} as GaugeOptions,
     },
   ];
 
@@ -243,7 +254,7 @@ export async function generateReportImage(data: ReportData): Promise<Buffer> {
     ctx.fillText(c.label, x + 24, y + 30);
 
     // Gauge
-    const gaugeBuf = renderGaugeToBuffer(c.gaugeValue, c.gaugeMin, c.gaugeMax, c.valueColor);
+    const gaugeBuf = renderGaugeToBuffer(c.gaugeValue, c.gaugeMin, c.gaugeMax, c.valueColor, c.gaugeOpts);
     const gaugeImg = await loadImage(gaugeBuf);
     ctx.drawImage(gaugeImg, x + (cardW - 160) / 2, y + 44, 160, 160);
 

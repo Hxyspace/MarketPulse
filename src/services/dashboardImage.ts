@@ -84,7 +84,17 @@ function drawAccentLine(ctx: CanvasRenderingContext2D, x: number, y: number, w: 
   ctx.restore();
 }
 
-function renderGaugeToBuffer(value: number, min: number, max: number, accentColor: string, size = 200): Buffer {
+interface GaugeOptions {
+  unit?: string;
+  zones?: [number, string][];
+  splitNumber?: number;
+}
+
+function renderGaugeToBuffer(value: number, min: number, max: number, accentColor: string, opts?: GaugeOptions & { size?: number }): Buffer {
+  const unit = opts?.unit || '\u2103';
+  const zones = opts?.zones || [[0.3, GREEN], [0.8, AMBER], [1, RED]];
+  const splitNumber = opts?.splitNumber || 5;
+  const size = opts?.size || 200;
   const canvas = createCanvas(size, size);
   const chart = echarts.init(canvas as any);
 
@@ -97,15 +107,11 @@ function renderGaugeToBuffer(value: number, min: number, max: number, accentColo
       startAngle: 210,
       endAngle: -30,
       min, max,
-      splitNumber: 5,
+      splitNumber,
       axisLine: {
         lineStyle: {
           width: 16,
-          color: [
-            [0.3, GREEN],
-            [0.8, AMBER],
-            [1, RED],
-          ],
+          color: zones,
         },
       },
       pointer: {
@@ -118,7 +124,10 @@ function renderGaugeToBuffer(value: number, min: number, max: number, accentColo
       splitLine: { show: false },
       axisLabel: { show: false },
       detail: {
-        formatter: (v: number) => v.toFixed(1),
+        formatter: (v: number) => {
+          const f = unit === '%' ? v.toFixed(2) : v.toFixed(1);
+          return f + unit;
+        },
         fontSize: 22,
         fontWeight: 'bold' as const,
         color: TEXT,
@@ -370,7 +379,9 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.strokeStyle = 'rgba(0,0,0,0.04)';
   ctx.beginPath(); ctx.moveTo(cardX + gaugeW, sectionY + 20); ctx.lineTo(cardX + gaugeW, sectionY + cardH1 - 20); ctx.stroke();
 
-  const gaugeBuf1 = renderGaugeToBuffer(data.returnDiff.diff, -15, 15, diffColor(data.returnDiff.diff));
+  const gaugeBuf1 = renderGaugeToBuffer(data.returnDiff.diff, -15, 15, diffColor(data.returnDiff.diff), {
+    unit: '%', zones: [[0.467, GREEN], [0.833, AMBER], [1, RED]], splitNumber: 6,
+  });
   const gaugeImg1 = await loadImage(gaugeBuf1);
   ctx.drawImage(gaugeImg1, cardX + (gaugeW - 200) / 2, sectionY + 10, 200, 200);
 
@@ -406,11 +417,11 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.font = '10px "Cascadia Code", "Consolas", monospace';
   let rx = detailX + 12;
   const ry = ruleY + 22;
-  ctx.fillStyle = RED; ctx.fillText('>+10%', rx, ry); rx += ctx.measureText('>+10%').width;
+  ctx.fillStyle = RED; ctx.fillText('> +10%', rx, ry); rx += ctx.measureText('> +10%').width;
   ctx.fillStyle = TEXT_DIM; ctx.fillText(' 过热·减仓 │ ', rx, ry); rx += ctx.measureText(' 过热·减仓 │ ').width;
-  ctx.fillStyle = AMBER; ctx.fillText('-1%~+10%', rx, ry); rx += ctx.measureText('-1%~+10%').width;
+  ctx.fillStyle = AMBER; ctx.fillText('-1% ~ +10%', rx, ry); rx += ctx.measureText('-1% ~ +10%').width;
   ctx.fillStyle = TEXT_DIM; ctx.fillText(' 正常·持有 │ ', rx, ry); rx += ctx.measureText(' 正常·持有 │ ').width;
-  ctx.fillStyle = GREEN; ctx.fillText('<-1%', rx, ry); rx += ctx.measureText('<-1%').width;
+  ctx.fillStyle = GREEN; ctx.fillText('< -1%', rx, ry); rx += ctx.measureText('< -1%').width;
   ctx.fillStyle = TEXT_DIM; ctx.fillText(' 过冷·加仓', rx, ry);
 
   sectionY += cardH1 + 24;
@@ -456,7 +467,9 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.strokeStyle = 'rgba(0,0,0,0.04)';
   ctx.beginPath(); ctx.moveTo(cardX + gaugeW, sectionY + 20); ctx.lineTo(cardX + gaugeW, sectionY + cardH2 - 20); ctx.stroke();
 
-  const gaugeBuf2 = renderGaugeToBuffer(data.bondWeather.temperature, 0, 100, tempColor(data.bondWeather.temperature));
+  const gaugeBuf2 = renderGaugeToBuffer(data.bondWeather.temperature, 0, 100, tempColor(data.bondWeather.temperature), {
+    unit: '\u2103', zones: [[0.3, GREEN], [0.8, AMBER], [1, RED]],
+  });
   const gaugeImg2 = await loadImage(gaugeBuf2);
   ctx.drawImage(gaugeImg2, cardX + (gaugeW - 200) / 2, sectionY + 10, 200, 200);
 
@@ -530,7 +543,9 @@ export async function generateDashboardImage(data: DashboardData): Promise<Buffe
   ctx.strokeStyle = 'rgba(0,0,0,0.04)';
   ctx.beginPath(); ctx.moveTo(cardX + gaugeW, sectionY + 20); ctx.lineTo(cardX + gaugeW, sectionY + cardH3 - 20); ctx.stroke();
 
-  const gaugeBuf3 = renderGaugeToBuffer(data.thermometer.temperature, 0, 100, tempColor(data.thermometer.temperature));
+  const gaugeBuf3 = renderGaugeToBuffer(data.thermometer.temperature, 0, 100, tempColor(data.thermometer.temperature), {
+    unit: '\u2103', zones: [[0.3, GREEN], [0.8, AMBER], [1, RED]],
+  });
   const gaugeImg3 = await loadImage(gaugeBuf3);
   ctx.drawImage(gaugeImg3, cardX + (gaugeW - 200) / 2, sectionY + 10, 200, 200);
 
