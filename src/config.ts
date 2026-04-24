@@ -1,5 +1,6 @@
 export const CONFIG = {
   port: 3000,
+  lanUrl: '' as string,
 
   // 中证指数官方API（替代东方财富，解决TLS连接问题）
   csi: {

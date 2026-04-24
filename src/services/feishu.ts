@@ -225,7 +225,7 @@ export async function sendDailyReport(data: {
       `PE ${thermometer.pe} | 国债 ${thermometer.bondYield}% | ERP ${thermometer.erp}%`,
     ].join('\n') });
   }
-  const dashUrl = `http://localhost:${CONFIG.port}`;
+  const dashUrl = CONFIG.lanUrl || `http://localhost:${CONFIG.port}`;
   const appLink = `https://applink.feishu.cn/client/web_url/open?mode=appCenter&url=${encodeURIComponent(dashUrl)}`;
   elements.push({ tag: 'hr' });
   elements.push({ tag: 'markdown', content: `📈 [Dashboard](${appLink})` });
