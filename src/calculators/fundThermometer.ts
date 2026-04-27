@@ -21,10 +21,6 @@ export interface FundThermometerResult {
   erpHistory: ErpHistoryItem[];  // 全部股债利差历史
 }
 
-function getDateStr(d: Date): string {
-  return d.toISOString().split('T')[0].replace(/-/g, '');
-}
-
 /**
  * 将沪深300 K线与10年国债收益率按日期对齐，计算股债利差
  */
@@ -76,47 +72,9 @@ function calcErpSeries(
  * （百分位高→利差大→股票便宜→温度低）
  */
 export async function getFundThermometer(): Promise<FundThermometerResult> {
-  const endDate = getDateStr(new Date());
-  // 从2011年7月开始（CSI API最早有PE数据的时间）
-  const startDate = '20110701';
-
-  const [klineData, yieldData] = await Promise.all([
-    fetchCSI300(startDate, endDate),
-    getBondYieldData(),
-  ]);
-
-  const erpSeries = calcErpSeries(klineData, yieldData);
-  if (erpSeries.length < 100) {
-    throw new Error('Insufficient ERP data for thermometer calculation');
-  }
-
-  // 取最近10年计算百分位（约2500个交易日）
-  const recent10y = erpSeries.slice(-2500);
-  const latest = recent10y[recent10y.length - 1];
-  const prev = recent10y.length > 1 ? recent10y[recent10y.length - 2] : latest;
-
-  const erpValues = recent10y.map(d => d.erp);
-  const currentErp = latest.erp;
-
-  // 股债利差百分位（利差越高=越多天比现在低=百分位越高=股票越便宜）
-  const erpPercentile = (erpValues.filter(v => v < currentErp).length / erpValues.length) * 100;
-
-  // 温度 = 100 - 股债利差百分位
-  const temperature = Math.round((100 - erpPercentile) * 10) / 10;
-
-  return {
-    date: latest.date,
-    temperature,
-    status: getTemperatureStatus(temperature),
-    interpretation: getTemperatureInterpretation(temperature),
-    csi300Close: latest.close,
-    csi300Change: latest.changePercent || Math.round((latest.close / prev.close - 1) * 10000) / 100,
-    pe: Math.round(latest.pe * 100) / 100,
-    bondYield: Math.round(latest.bondYield * 10000) / 10000,
-    erp: Math.round(latest.erp * 100) / 100,
-    percentile: Math.round((100 - erpPercentile) * 10) / 10,
-    erpHistory: erpSeries.map(d => ({ date: d.date, erp: Math.round(d.erp * 100) / 100, close: d.close })),
-  };
+  const result = await getFundThermometerByDate(new Date().toISOString().split('T')[0]);
+  if (!result) throw new Error('No fund thermometer data available');
+  return result;
 }
 
 function getTemperatureStatus(temp: number): string {
@@ -148,13 +106,16 @@ export async function getFundThermometerByDate(queryDate: string): Promise<FundT
   const allFiltered = erpSeries.filter(d => d.date <= queryDate);
   if (allFiltered.length < 100) return null;
 
-  // 取最近10年计算百分位
+  // 取最近10年计算百分位（约2500个交易日）
   const recent10y = allFiltered.slice(-2500);
   const latest = recent10y[recent10y.length - 1];
   const prev = recent10y.length > 1 ? recent10y[recent10y.length - 2] : latest;
 
   const erpValues = recent10y.map(d => d.erp);
+
+  // 股债利差百分位（利差越高=越多天比现在低=百分位越高=股票越便宜）
   const erpPercentile = (erpValues.filter(v => v < latest.erp).length / erpValues.length) * 100;
+  // 温度 = 100 - 股债利差百分位
   const temperature = Math.round((100 - erpPercentile) * 10) / 10;
 
   return {

@@ -15,10 +15,6 @@ export interface CompassHistory {
   history: CompassResult[];  // 2020年以来的历史数据
 }
 
-function getDateStr(d: Date): string {
-  return d.toISOString().split('T')[0].replace(/-/g, '');
-}
-
 /**
  * 计算40日收益差
  * 公式：(红利低波今日收盘/红利低波40个交易日前收盘 - 1) - (中证全指今日收盘/中证全指40个交易日前收盘 - 1)
@@ -78,11 +74,11 @@ function getCompassInterpretation(diff: number): string {
 }
 
 /**
- * 获取完整的40日收益差数据（2020年至今）
+ * 查询指定日期的40日收益差（含完整历史）
  */
-export async function getDividendCompassData(): Promise<CompassHistory> {
-  const endDate = getDateStr(new Date());
-  const startDate = '20191101'; // 从2019年11月开始取数据，确保2020年1月有40日数据
+export async function getDividendCompassByDate(queryDate: string): Promise<CompassHistory> {
+  const endDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const startDate = '20191101';
 
   const [dividendData, allShareData] = await Promise.all([
     fetchDividendLowVol(startDate, endDate),
@@ -90,24 +86,20 @@ export async function getDividendCompassData(): Promise<CompassHistory> {
   ]);
 
   const allResults = calculate40DayDiff(dividendData, allShareData);
-
-  // 只保留2020年以来的数据
   const history = allResults.filter(r => r.date >= '2020-01-01');
-  const latest = history[history.length - 1];
+
+  let latest = history[history.length - 1];
+  for (const r of history) {
+    if (r.date <= queryDate) latest = r;
+    else break;
+  }
 
   return { latest, history };
 }
 
 /**
- * 查询指定日期的40日收益差
+ * 获取最新40日收益差数据
  */
-export async function getDividendCompassByDate(queryDate: string): Promise<CompassResult | null> {
-  const { history } = await getDividendCompassData();
-  // 找到该日期或之前最近的交易日
-  let best: CompassResult | null = null;
-  for (const r of history) {
-    if (r.date <= queryDate) best = r;
-    else break;
-  }
-  return best;
+export async function getDividendCompassData(): Promise<CompassHistory> {
+  return getDividendCompassByDate(new Date().toISOString().split('T')[0]);
 }

@@ -1,4 +1,4 @@
-import { getRecentBondData, getAllBondData, BondIndexData } from '../services/chinabond';
+import { getAllBondData, BondIndexData } from '../services/chinabond';
 
 export interface BondBarometerResult {
   latest: {
@@ -80,32 +80,40 @@ function calculateBondTemperature(allData: BondIndexData[], currentValue: number
 }
 
 /**
- * 获取债市晴雨表数据
+ * 查询指定日期的债市晴雨表
  */
-export async function getBondBarometer(): Promise<BondBarometerResult> {
-  // 获取全量历史数据（2002年至今）
+export async function getBondByDate(queryDate: string): Promise<BondBarometerResult> {
   const allHistory = await getAllBondData();
 
   if (allHistory.length < 2) {
     throw new Error('Bond data insufficient');
   }
 
-  const latestData = allHistory[allHistory.length - 1];
-  const prevData = allHistory[allHistory.length - 2];
+  // 找到queryDate或之前最近的交易日
+  let targetIdx = allHistory.length - 1;
+  for (let i = allHistory.length - 1; i >= 0; i--) {
+    if (allHistory[i].date <= queryDate) { targetIdx = i; break; }
+  }
+  if (targetIdx < 1) {
+    throw new Error('No bond data available for this date');
+  }
+
+  const latestData = allHistory[targetIdx];
+  const prevData = allHistory[targetIdx - 1];
   const change = latestData.value - prevData.value;
   const changePercent = (change / prevData.value) * 100;
 
-  // 计算债市温度
-  const temperature = calculateBondTemperature(allHistory, latestData.value);
+  // 计算债市温度（使用目标日期及之前的数据）
+  const temperature = calculateBondTemperature(allHistory.slice(0, targetIdx + 1), latestData.value);
 
-  // 最近30天数据
+  // 目标日期前30天数据
   const recentDays = [];
-  const last30 = allHistory.slice(-31);
-  for (let i = 1; i < last30.length; i++) {
-    const dayChange = last30[i].value - last30[i - 1].value;
+  const start = Math.max(1, targetIdx - 29);
+  for (let i = start; i <= targetIdx; i++) {
+    const dayChange = allHistory[i].value - allHistory[i - 1].value;
     recentDays.push({
-      date: last30[i].date,
-      value: last30[i].value,
+      date: allHistory[i].date,
+      value: allHistory[i].value,
       change: Math.round(dayChange * 10000) / 10000,
       weather: getBondWeather(dayChange),
     });
@@ -126,43 +134,10 @@ export async function getBondBarometer(): Promise<BondBarometerResult> {
 }
 
 /**
- * 查询指定日期的债市温度
+ * 获取最新债市晴雨表数据
  */
-export async function getBondByDate(queryDate: string): Promise<{
-  date: string;
-  value: number;
-  change: number;
-  weather: string;
-  temperature: { value: number; percentile: number; status: string; interpretation: string };
-} | null> {
-  const allHistory = await getAllBondData();
-  // 找到该日期或之前最近的交易日
-  let idx = -1;
-  for (let i = 0; i < allHistory.length; i++) {
-    if (allHistory[i].date <= queryDate) idx = i;
-    else break;
-  }
-  if (idx < 1) return null;
-
-  const target = allHistory[idx];
-  const prev = allHistory[idx - 1];
-  const change = Math.round((target.value - prev.value) * 10000) / 10000;
-
-  // 取该日期之前5年数据计算温度
-  const fiveYearsAgo = new Date(target.date);
-  fiveYearsAgo.setFullYear(fiveYearsAgo.getFullYear() - 5);
-  const fiveYearsAgoStr = fiveYearsAgo.toISOString().split('T')[0];
-  const dataFor5y = allHistory.filter(d => d.date >= fiveYearsAgoStr && d.date <= target.date);
-
-  const temperature = calculateBondTemperature(dataFor5y, target.value);
-
-  return {
-    date: target.date,
-    value: target.value,
-    change,
-    weather: getBondWeather(change),
-    temperature,
-  };
+export async function getBondBarometer(): Promise<BondBarometerResult> {
+  return getBondByDate(new Date().toISOString().split('T')[0]);
 }
 
 /**
