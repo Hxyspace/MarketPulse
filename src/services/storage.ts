@@ -43,48 +43,11 @@ export function saveLocalData<T>(filename: string, items: T[], lastUpdate?: stri
 }
 
 /**
- * 获取今天的日期字符串 YYYY-MM-DD
- */
-export function getTodayStr(): string {
-  return new Date().toISOString().split('T')[0];
-}
-
-/**
- * 获取今天的日期字符串 YYYYMMDD
- */
-export function getTodayCompact(): string {
-  return getTodayStr().replace(/-/g, '');
-}
-
-/**
  * 获取当前北京时间的小时数
  */
 function getBeijingHour(): number {
   const now = new Date();
   return (now.getUTCHours() + 8) % 24;
-}
-
-/**
- * 判断当前时间是否已过8点（交易日数据更新时间）
- */
-export function isPastUpdateTime(): boolean {
-  return getBeijingHour() >= 8;
-}
-
-/**
- * 判断当前时间是否已过数据更新（18:00北京时间，数据源通常在晚间更新完毕）
- */
-export function isPastDataUpdate(): boolean {
-  return getBeijingHour() >= 18;
-}
-
-/**
- * 判断给定日期是否是交易日（排除周末，不排除节假日）
- */
-export function isTradingDay(dateStr: string): boolean {
-  const d = new Date(dateStr + 'T00:00:00Z');
-  const day = d.getUTCDay();
-  return day !== 0 && day !== 6;
 }
 
 /**
@@ -114,26 +77,3 @@ export function needsUpdate(lastDataDate: string): boolean {
   return lastDataDate < latestTradingDate;
 }
 
-/**
- * 找出缺失的日期范围
- * 返回需要补充的起始日期（YYYYMMDD格式）
- */
-export function findMissingStartDate(
-  existingDates: string[],  // YYYY-MM-DD
-  expectedStartDate: string, // YYYY-MM-DD
-): string | null {
-  if (existingDates.length === 0) return expectedStartDate.replace(/-/g, '');
-
-  const sorted = [...existingDates].sort();
-  const lastDate = sorted[sorted.length - 1];
-
-  // 使用智能判断：本地数据是否已覆盖到最近交易日
-  if (!needsUpdate(lastDate)) {
-    return null;
-  }
-
-  // 从最后一条数据的下一天开始补充
-  const nextDay = new Date(lastDate);
-  nextDay.setDate(nextDay.getDate() + 1);
-  return nextDay.toISOString().split('T')[0].replace(/-/g, '');
-}

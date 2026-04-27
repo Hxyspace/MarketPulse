@@ -1,5 +1,5 @@
 import * as https from 'https';
-import { loadLocalData, saveLocalData, findMissingStartDate, getTodayCompact } from './storage';
+import { loadLocalData, saveLocalData, needsUpdate, getLatestTradingDate } from './storage';
 
 export interface KlineData {
   date: string;    // YYYY-MM-DD
@@ -295,34 +295,44 @@ async function getIndexDataCached(
   defaultStartDate: string,  // YYYYMMDD
 ): Promise<KlineData[]> {
   const stored = loadLocalData<KlineData>(storageKey);
-  let existingData = stored?.items || [];
-  const existingDates = existingData.map(d => d.date);
 
-  const missingStart = findMissingStartDate(
-    existingDates,
-    defaultStartDate.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
-  );
+  if (stored && stored.items.length > 0) {
+    const lastDate = stored.items[stored.items.length - 1].date;
 
-  if (!missingStart) {
-    console.log(`[Storage] ${storageKey}: data up-to-date (${existingData.length} items)`);
-    return existingData;
+    if (!needsUpdate(lastDate)) {
+      console.log(`[Storage] ${storageKey}: up-to-date (${stored.items.length} items, last: ${lastDate})`);
+      return stored.items;
+    }
+
+    // 增量更新：从最后日期开始拉取，依靠 dedup 去重
+    const fetchStart = lastDate.replace(/-/g, '');
+    const endDate = getLatestTradingDate().replace(/-/g, '');
+    console.log(`[Storage] ${storageKey}: fetching from ${fetchStart} to ${endDate}...`);
+    const newData = await fetchByYears(indexCode, fetchStart, endDate);
+
+    if (newData.length > 0) {
+      const dateSet = new Set(stored.items.map(d => d.date));
+      const deduped = newData.filter(d => !dateSet.has(d.date));
+      const merged = [...stored.items, ...deduped].sort((a, b) => a.date.localeCompare(b.date));
+      saveLocalData(storageKey, merged);
+      console.log(`[Storage] ${storageKey}: updated to ${merged.length} items (+${deduped.length} new)`);
+      return merged;
+    } else {
+      console.warn(`[Index] No new data returned for ${storageKey}: ${fetchStart} to ${endDate}`);
+    }
+
+    return stored.items;
   }
 
-  // missingStart is YYYY-MM-DD, convert to YYYYMMDD
-  const fetchStart = missingStart.replace(/-/g, '');
-  const endDate = getTodayCompact();
-  console.log(`[Storage] ${storageKey}: fetching from ${fetchStart} to ${endDate}...`);
-  const newData = await fetchByYears(indexCode, fetchStart, endDate);
-
-  if (newData.length > 0) {
-    const dateSet = new Set(existingDates);
-    const deduped = newData.filter(d => !dateSet.has(d.date));
-    existingData = [...existingData, ...deduped].sort((a, b) => a.date.localeCompare(b.date));
-    saveLocalData(storageKey, existingData);
-    console.log(`[Storage] ${storageKey}: saved ${existingData.length} items`);
+  // 首次拉取：从默认起始日期开始
+  const endDate = getLatestTradingDate().replace(/-/g, '');
+  console.log(`[Storage] ${storageKey}: initial fetch from ${defaultStartDate} to ${endDate}...`);
+  const freshData = await fetchByYears(indexCode, defaultStartDate, endDate);
+  if (freshData.length > 0) {
+    saveLocalData(storageKey, freshData);
+    console.log(`[Storage] ${storageKey}: saved ${freshData.length} items`);
   }
-
-  return existingData;
+  return freshData;
 }
 
 /**
