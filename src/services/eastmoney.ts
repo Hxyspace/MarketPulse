@@ -35,6 +35,9 @@ const TENCENT_CODES: Record<string, string> = {
   '000985': 'sh000985',
 };
 
+// 全项目统一的历史起始日期，与 10 年期国债收益率（2010-01-01）对齐
+const DEFAULT_START_DATE = '20100101';
+
 interface CsiPerfItem {
   tradeDate: string;    // YYYYMMDD
   indexCode: string;
@@ -77,7 +80,7 @@ function enqueue<T>(fn: () => Promise<T>): Promise<T> {
 /**
  * 从CSI官方API获取指数日K数据（串行化，带重试）
  */
-function fetchCsiChunk(
+function fetchCsiAll(
   indexCode: string,
   startDate: string,
   endDate: string,
@@ -89,10 +92,9 @@ function fetchCsiChunk(
         console.log(`[CSI] Retry ${attempt} for ${indexCode} ${startDate}-${endDate}...`);
         await sleep(2000 * attempt);
       }
-
       try {
-        const items = await _fetchCsiChunkRaw(indexCode, startDate, endDate);
-        await sleep(500); // 请求间隔
+        const items = await _fetchCsiRaw(indexCode, startDate, endDate);
+        await sleep(500); // 与下一次请求保持间隔
         return items;
       } catch (err) {
         if (attempt === retries) throw err;
@@ -102,7 +104,7 @@ function fetchCsiChunk(
   });
 }
 
-function _fetchCsiChunkRaw(
+function _fetchCsiRaw(
   indexCode: string,
   startDate: string,
   endDate: string,
@@ -118,14 +120,15 @@ function _fetchCsiChunkRaw(
 }
 
 /**
- * 从腾讯财经API获取指数日K数据（单次最多500条）
+ * 备用：从腾讯财经 API 获取指数日 K（单次最多 2000 条 ≈ 8 年）。
+ * 当前主路径仅使用 CSI；保留 export 以便将来切换或调试，编译期不会被树摇删除。
  */
-function fetchTencentKline(
+export function fetchTencentKline(
   tencentCode: string,
   startDate: string,  // YYYY-MM-DD
   endDate: string,
 ): Promise<KlineData[]> {
-  const url = `${TENCENT_API}?param=${tencentCode},day,${startDate},${endDate},500,`;
+  const url = `${TENCENT_API}?param=${tencentCode},day,${startDate},${endDate},2000,`;
   console.log(`[Tencent] Fetching ${tencentCode} ${startDate}-${endDate}...`);
   return httpsJson<{ data?: Record<string, { day?: string[][]; qfqday?: string[][] }> }>(url, {
     headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -148,82 +151,6 @@ function fetchTencentKline(
       turnover: 0,
     }));
   });
-}
-
-/**
- * 从腾讯API分段拉取（每次500条，约2年）
- */
-async function fetchTencentByYears(
-  tencentCode: string,
-  startDate: string,  // YYYYMMDD
-  endDate: string,
-): Promise<KlineData[]> {
-  const startYear = parseInt(startDate.substring(0, 4));
-  const endYear = parseInt(endDate.substring(0, 4));
-  const allData: KlineData[] = [];
-
-  // 每2年一批
-  for (let y = startYear; y <= endYear; y += 2) {
-    const ys = y === startYear ? `${startDate.substring(0, 4)}-${startDate.substring(4, 6)}-${startDate.substring(6, 8)}` : `${y}-01-01`;
-    const ye2 = Math.min(y + 1, endYear);
-    const ye = ye2 === endYear ? `${endDate.substring(0, 4)}-${endDate.substring(4, 6)}-${endDate.substring(6, 8)}` : `${ye2}-12-31`;
-
-    try {
-      const chunk = await fetchTencentKline(tencentCode, ys, ye);
-      allData.push(...chunk);
-      await sleep(300);
-    } catch (err) {
-      console.error(`[Tencent] Error:`, err instanceof Error ? err.message : err);
-    }
-  }
-
-  return allData;
-}
-
-/**
- * 分年份拉取大量历史数据（腾讯优先 → CSI备用）
- */
-async function fetchByYears(
-  indexCode: string,
-  startDate: string,  // YYYYMMDD
-  endDate: string,
-): Promise<KlineData[]> {
-  // 如果有腾讯代码，优先用腾讯（更稳定，不容易被WAF拦截）
-  const tencentCode = TENCENT_CODES[indexCode];
-  if (tencentCode) {
-    console.log(`[Fetch] Using Tencent API for ${indexCode}...`);
-    const tencentData = await fetchTencentByYears(tencentCode, startDate, endDate);
-    if (tencentData.length > 0) return tencentData;
-    console.log(`[Fetch] Tencent failed, falling back to CSI for ${indexCode}...`);
-  }
-
-  // CSI作为主要/备用源
-  return fetchByYearsCSI(indexCode, startDate, endDate);
-}
-
-async function fetchByYearsCSI(
-  indexCode: string,
-  startDate: string,
-  endDate: string,
-): Promise<KlineData[]> {
-  const startYear = parseInt(startDate.substring(0, 4));
-  const endYear = parseInt(endDate.substring(0, 4));
-  const allData: KlineData[] = [];
-
-  for (let year = startYear; year <= endYear; year++) {
-    const ys = year === startYear ? startDate : `${year}0101`;
-    const ye = year === endYear ? endDate : `${year}1231`;
-    try {
-      const items = await fetchCsiChunk(indexCode, ys, ye);
-      for (const item of items) {
-        allData.push(csiToKline(item));
-      }
-    } catch (err) {
-      console.error(`[CSI] Error fetching ${indexCode} ${ys}-${ye}:`, err instanceof Error ? err.message : err);
-    }
-  }
-
-  return allData;
 }
 
 function csiToKline(item: CsiPerfItem): KlineData {
@@ -253,7 +180,6 @@ function csiToKline(item: CsiPerfItem): KlineData {
 async function getIndexDataCached(
   indexCode: string,
   storageKey: string,
-  defaultStartDate: string,  // YYYYMMDD
 ): Promise<KlineData[]> {
   const stored = loadLocalData<KlineData>(storageKey);
 
@@ -269,7 +195,8 @@ async function getIndexDataCached(
     const fetchStart = lastDate.replace(/-/g, '');
     const endDate = getLatestTradingDate().replace(/-/g, '');
     console.log(`[Storage] ${storageKey}: fetching from ${fetchStart} to ${endDate}...`);
-    const newData = await fetchByYears(indexCode, fetchStart, endDate);
+    const newItems = await fetchCsiAll(indexCode, fetchStart, endDate);
+    const newData = newItems.map(csiToKline);
 
     if (newData.length > 0) {
       const dateSet = new Set(stored.items.map(d => d.date));
@@ -287,8 +214,9 @@ async function getIndexDataCached(
 
   // 首次拉取：从默认起始日期开始
   const endDate = getLatestTradingDate().replace(/-/g, '');
-  console.log(`[Storage] ${storageKey}: initial fetch from ${defaultStartDate} to ${endDate}...`);
-  const freshData = await fetchByYears(indexCode, defaultStartDate, endDate);
+  console.log(`[Storage] ${storageKey}: initial fetch from ${DEFAULT_START_DATE} to ${endDate}...`);
+  const items = await fetchCsiAll(indexCode, DEFAULT_START_DATE, endDate);
+  const freshData = items.map(csiToKline);
   if (freshData.length > 0) {
     saveLocalData(storageKey, freshData);
     console.log(`[Storage] ${storageKey}: saved ${freshData.length} items`);
@@ -299,20 +227,20 @@ async function getIndexDataCached(
 /**
  * 获取红利低波指数数据
  */
-export async function fetchDividendLowVol(startDate: string, _endDate: string) {
-  return getIndexDataCached(INDEX_CODES.dividendLowVol, 'dividend_low_vol.json', startDate);
+export async function fetchDividendLowVol(): Promise<KlineData[]> {
+  return getIndexDataCached(INDEX_CODES.dividendLowVol, 'dividend_low_vol.json');
 }
 
 /**
  * 获取中证全指数据（替代万得全A）
  */
-export async function fetchAllShare(startDate: string, _endDate: string) {
-  return getIndexDataCached(INDEX_CODES.allShare, 'all_share.json', startDate);
+export async function fetchAllShare(): Promise<KlineData[]> {
+  return getIndexDataCached(INDEX_CODES.allShare, 'all_share.json');
 }
 
 /**
- * 获取沪深300数据
+ * 获取沪深300数据（000300，早期可能缺 peg/PE）
  */
-export async function fetchCSI300(startDate: string, _endDate: string) {
-  return getIndexDataCached(INDEX_CODES.csi300, 'csi300.json', startDate);
+export async function fetchCSI300(): Promise<KlineData[]> {
+  return getIndexDataCached(INDEX_CODES.csi300, 'csi300.json');
 }

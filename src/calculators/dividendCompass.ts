@@ -78,12 +78,9 @@ function getCompassInterpretation(diff: number): string {
  * 查询指定日期的40日收益差（含完整历史）
  */
 export async function getDividendCompassByDate(queryDate: string): Promise<CompassHistory> {
-  const endDate = bjDate().replace(/-/g, '');
-  const startDate = '20191101';
-
   const [dividendData, allShareData] = await Promise.all([
-    fetchDividendLowVol(startDate, endDate),
-    fetchAllShare(startDate, endDate),
+    fetchDividendLowVol(),
+    fetchAllShare(),
   ]);
 
   const allResults = calculate40DayDiff(dividendData, allShareData);

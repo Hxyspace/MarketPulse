@@ -94,12 +94,8 @@ function getTemperatureInterpretation(temp: number): string {
  * 查询指定日期的基金温度
  */
 export async function getFundThermometerByDate(queryDate: string): Promise<FundThermometerResult | null> {
-  // 从2011年7月开始（CSI API最早有PE数据的时间）
-  const startDate = '20110701';
-  const endDateCompact = queryDate.replace(/-/g, '');
-
   const [klineData, yieldData] = await Promise.all([
-    fetchCSI300(startDate, endDateCompact),
+    fetchCSI300(),
     getBondYieldData(),
   ]);
 
