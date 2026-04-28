@@ -793,6 +793,25 @@ function tooltip() {
   };
 }
 
+/* ── Hover dot ── */
+function hoverDot(color) {
+  return {
+    symbol: 'circle',
+    symbolSize: 9,
+    showSymbol: false,
+    itemStyle: {
+      color: C.bg,
+      borderColor: color,
+      borderWidth: 2,
+    },
+  };
+}
+
+/** Inline colored dot for tooltip (independent of series itemStyle) */
+function tipDot(color) {
+  return '<span style="display:inline-block;width:10px;height:10px;border-radius:5px;background:' + color + ';margin-right:4px;vertical-align:middle"></span>';
+}
+
 /* ── Gauge builder ── */
 function renderGauge(el, value, label, opts) {
   opts = opts || {};
@@ -930,11 +949,10 @@ function renderDiffHistory(history) {
     grid: baseGrid(),
     xAxis: baseAxis(dates),
     yAxis: baseYAxis({ label: { formatter: function(v) { return v + '%'; } } }),
-    series: [{
+    series: [Object.assign({
       type: 'line',
       data: diffs,
       smooth: 0.3,
-      symbol: 'none',
       lineStyle: { width: 1.5, color: C.accent },
       areaStyle: { color: grad(0, 95, 184) },
       markLine: {
@@ -947,7 +965,7 @@ function renderDiffHistory(history) {
           { yAxis: 0, lineStyle: { color: C.textDim, opacity: 0.4 }, label: { formatter: '0', color: C.textDim, position: 'insideEndTop' } },
         ]
       }
-    }],
+    }, hoverDot(C.accent))],
     dataZoom: baseZoom(start),
   });
 }
@@ -998,14 +1016,13 @@ function renderBondHistory(history) {
     grid: baseGrid(),
     xAxis: baseAxis(dates),
     yAxis: baseYAxis({ scale: true }),
-    series: [{
+    series: [Object.assign({
       type: 'line',
       data: values,
       smooth: 0.3,
-      symbol: 'none',
       lineStyle: { width: 1.5, color: C.green },
       areaStyle: { color: grad(15, 123, 15) },
-    }],
+    }, hoverDot(C.green))],
     dataZoom: baseZoom(0),
   });
 }
@@ -1065,8 +1082,9 @@ function renderErpHistory(erpHistory) {
         var s = '<span style="color:' + C.textDim + '">' + params[0].axisValue + '</span>';
         for (var i = 0; i < params.length; i++) {
           var p = params[i];
+          var lineColor = p.seriesName === '股债利差' ? C.amber : C.blue;
           var suf = p.seriesName === '股债利差' ? '%' : '';
-          s += '<br/>' + p.marker + ' ' + p.seriesName + '：<b>' + p.value + suf + '</b>';
+          s += '<br/>' + tipDot(lineColor) + ' ' + p.seriesName + '：<b>' + p.value + suf + '</b>';
         }
         return s;
       }
@@ -1093,18 +1111,18 @@ function renderErpHistory(erpHistory) {
       splitLine: { show: false },
       axisLine: { show: false }, axisTick: { show: false },
     }],
-    series: [{
+    series: [Object.assign({
       name: '股债利差',
       type: 'line', data: erpValues, yAxisIndex: 0,
-      smooth: 0.3, symbol: 'none',
+      smooth: 0.3,
       lineStyle: { width: 1.5, color: C.amber },
       areaStyle: { color: grad(157, 93, 0) },
-    }, {
+    }, hoverDot(C.amber)), Object.assign({
       name: '沪深300',
       type: 'line', data: closeValues, yAxisIndex: 1,
-      smooth: 0.3, symbol: 'none',
+      smooth: 0.3,
       lineStyle: { width: 1.2, color: C.blue, opacity: 0.6 },
-    }],
+    }, hoverDot(C.blue))],
     dataZoom: baseZoom(start),
   });
 }
