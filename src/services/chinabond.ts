@@ -1,6 +1,7 @@
 import * as https from 'https';
 import { CONFIG } from '../config';
-import { loadLocalData, saveLocalData, needsUpdate, getLatestTradingDate } from './storage';
+import { loadLocalData, saveLocalData, needsUpdate } from './storage';
+import { tsToBjDate, getLatestTradingDate } from '../utils/date';
 
 export interface BondIndexData {
   date: string;   // YYYY-MM-DD
@@ -59,16 +60,7 @@ async function fetchChinabondFromApi(): Promise<BondIndexData[]> {
 
   const result: BondIndexData[] = [];
   for (const [tsStr, value] of Object.entries(rawData)) {
-    const ts = parseInt(tsStr, 10);
-    // 中债返回的是北京时间0点的时间戳，直接按UTC+8解析避免日期漂移
-    const d = new Date(ts);
-    const y = d.getUTCFullYear();
-    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(d.getUTCDate()).padStart(2, '0');
-    // 时间戳是UTC+8的0点 = UTC的前一天16:00，需要加8小时还原
-    const bjDate = new Date(ts + 8 * 3600 * 1000);
-    const dateStr = bjDate.toISOString().split('T')[0];
-    result.push({ date: dateStr, value });
+    result.push({ date: tsToBjDate(parseInt(tsStr, 10)), value });
   }
 
   result.sort((a, b) => a.date.localeCompare(b.date));

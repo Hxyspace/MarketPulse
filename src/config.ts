@@ -45,3 +45,14 @@ export const CONFIG = {
     },
   },
 };
+
+// 启动时检查飞书配置（缺失只警告，不阻断本地 dev 启动）
+{
+  const missing = (['FEISHU_APP_ID', 'FEISHU_APP_SECRET', 'FEISHU_CHAT_ID'] as const)
+    .filter((k) => !process.env[k]);
+  if (missing.length > 0) {
+    console.warn(
+      `[Config] 飞书凭据缺失: ${missing.join(', ')}。每日报告推送将被跳过。`,
+    );
+  }
+}

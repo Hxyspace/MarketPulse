@@ -1,5 +1,6 @@
 import * as https from 'https';
-import { loadLocalData, saveLocalData, needsUpdate, getLatestTradingDate } from './storage';
+import { loadLocalData, saveLocalData, needsUpdate } from './storage';
+import { tsToBjDate, getLatestTradingDate } from '../utils/date';
 
 export interface BondYieldData {
   date: string;   // YYYY-MM-DD
@@ -47,11 +48,10 @@ function fetchYieldFromApi(startDate: string, endDate: string): Promise<BondYiel
             resolve([]);
             return;
           }
-          const result: BondYieldData[] = json[0].seriesData.map((item: [number, number]) => {
-            // 中债返回的是北京时间0点的时间戳，加8小时还原
-            const bjDate = new Date(item[0] + 8 * 3600 * 1000);
-            return { date: bjDate.toISOString().split('T')[0], yield: item[1] };
-          });
+          const result: BondYieldData[] = json[0].seriesData.map((item: [number, number]) => ({
+            date: tsToBjDate(item[0]),
+            yield: item[1],
+          }));
           result.sort((a, b) => a.date.localeCompare(b.date));
           console.log(`[BondYield] Got ${result.length} data points`);
           resolve(result);

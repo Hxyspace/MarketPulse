@@ -1,5 +1,6 @@
 import * as https from 'https';
-import { loadLocalData, saveLocalData, needsUpdate, getLatestTradingDate } from './storage';
+import { loadLocalData, saveLocalData, needsUpdate } from './storage';
+import { getLatestTradingDate } from '../utils/date';
 
 export interface KlineData {
   date: string;    // YYYY-MM-DD

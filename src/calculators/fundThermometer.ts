@@ -1,5 +1,6 @@
 import { fetchCSI300, KlineData } from '../services/eastmoney';
 import { getBondYieldData, BondYieldData } from '../services/bondYield';
+import { bjDate } from '../utils/date';
 
 export interface ErpHistoryItem {
   date: string;
@@ -72,7 +73,7 @@ function calcErpSeries(
  * （百分位高→利差大→股票便宜→温度低）
  */
 export async function getFundThermometer(): Promise<FundThermometerResult> {
-  const result = await getFundThermometerByDate(new Date().toISOString().split('T')[0]);
+  const result = await getFundThermometerByDate(bjDate());
   if (!result) throw new Error('No fund thermometer data available');
   return result;
 }

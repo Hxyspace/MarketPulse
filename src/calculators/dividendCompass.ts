@@ -1,5 +1,6 @@
 import { fetchDividendLowVol, fetchAllShare, KlineData } from '../services/eastmoney';
 import { CONFIG } from '../config';
+import { bjDate } from '../utils/date';
 
 export interface CompassResult {
   date: string;
@@ -77,7 +78,7 @@ function getCompassInterpretation(diff: number): string {
  * 查询指定日期的40日收益差（含完整历史）
  */
 export async function getDividendCompassByDate(queryDate: string): Promise<CompassHistory> {
-  const endDate = new Date().toISOString().split('T')[0].replace(/-/g, '');
+  const endDate = bjDate().replace(/-/g, '');
   const startDate = '20191101';
 
   const [dividendData, allShareData] = await Promise.all([
@@ -101,5 +102,5 @@ export async function getDividendCompassByDate(queryDate: string): Promise<Compa
  * 获取最新40日收益差数据
  */
 export async function getDividendCompassData(): Promise<CompassHistory> {
-  return getDividendCompassByDate(new Date().toISOString().split('T')[0]);
+  return getDividendCompassByDate(bjDate());
 }

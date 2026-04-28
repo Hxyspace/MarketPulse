@@ -1,4 +1,5 @@
 import { getAllBondData, BondIndexData } from '../services/chinabond';
+import { bjDate } from '../utils/date';
 
 export interface BondBarometerResult {
   latest: {
@@ -137,7 +138,7 @@ export async function getBondByDate(queryDate: string): Promise<BondBarometerRes
  * 获取最新债市晴雨表数据
  */
 export async function getBondBarometer(): Promise<BondBarometerResult> {
-  return getBondByDate(new Date().toISOString().split('T')[0]);
+  return getBondByDate(bjDate());
 }
 
 /**
