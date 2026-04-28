@@ -1,6 +1,6 @@
-import * as https from 'https';
 import { loadLocalData, saveLocalData, needsUpdate } from './storage';
 import { tsToBjDate, getLatestTradingDate } from '../utils/date';
+import { httpsJson } from './httpClient';
 
 export interface BondYieldData {
   date: string;   // YYYY-MM-DD
@@ -9,10 +9,14 @@ export interface BondYieldData {
 
 const STORAGE_KEY = 'bond_yield_10y.json';
 
+interface BondYieldApiResponse {
+  seriesData?: [number, number][];
+}
+
 /**
  * 从中债信息网获取10年期国债收益率历史数据
  */
-function fetchYieldFromApi(startDate: string, endDate: string): Promise<BondYieldData[]> {
+async function fetchYieldFromApi(startDate: string, endDate: string): Promise<BondYieldData[]> {
   console.log(`[BondYield] Fetching ${startDate} to ${endDate}...`);
   const body = new URLSearchParams({
     bjlx: 'no',
@@ -27,45 +31,29 @@ function fetchYieldFromApi(startDate: string, endDate: string): Promise<BondYiel
     locale: 'zh_CN',
   }).toString();
 
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'yield.chinabond.com.cn',
-      path: '/cbweb-mn/yc/queryYz',
+  const json = await httpsJson<BondYieldApiResponse[]>(
+    'https://yield.chinabond.com.cn/cbweb-mn/yc/queryYz',
+    {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(body),
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         'Referer': 'https://yield.chinabond.com.cn/',
       },
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          if (!Array.isArray(json) || json.length === 0 || !json[0].seriesData) {
-            resolve([]);
-            return;
-          }
-          const result: BondYieldData[] = json[0].seriesData.map((item: [number, number]) => ({
-            date: tsToBjDate(item[0]),
-            yield: item[1],
-          }));
-          result.sort((a, b) => a.date.localeCompare(b.date));
-          console.log(`[BondYield] Got ${result.length} data points`);
-          resolve(result);
-        } catch {
-          reject(new Error('Failed to parse bond yield response'));
-        }
-      });
-    });
+      body,
+    },
+  );
 
-    req.on('error', reject);
-    req.setTimeout(30000, () => { req.destroy(new Error('Bond yield request timeout')); });
-    req.write(body);
-    req.end();
-  });
+  if (!Array.isArray(json) || json.length === 0 || !json[0].seriesData) {
+    return [];
+  }
+  const result: BondYieldData[] = json[0].seriesData.map((item) => ({
+    date: tsToBjDate(item[0]),
+    yield: item[1],
+  }));
+  result.sort((a, b) => a.date.localeCompare(b.date));
+  console.log(`[BondYield] Got ${result.length} data points`);
+  return result;
 }
 
 /**

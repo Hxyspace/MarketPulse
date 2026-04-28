@@ -1,32 +1,18 @@
-import * as https from 'https';
 import { CONFIG } from '../config';
 import { generateReportImage, ReportData } from './reportImage';
 import { generateDashboardImage, DashboardData } from './dashboardImage';
+import { httpsRequest } from './httpClient';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
-async function httpRequest(url: string, body: string, headers: Record<string, string>, method: string = 'POST'): Promise<{ status: number; data: string }> {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url);
-    const req = https.request({
-      hostname: u.hostname,
-      port: 443,
-      path: u.pathname + u.search,
-      method,
-      headers: { ...headers, 'Content-Length': String(Buffer.byteLength(body)) },
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => resolve({ status: res.statusCode || 0, data }));
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
+async function httpPost(
+  url: string,
+  body: string,
+  headers: Record<string, string>,
+  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST',
+): Promise<{ status: number; data: string }> {
+  return httpsRequest(url, { method, headers, body });
 }
-
-// Backward compat alias
-const httpPost = httpRequest;
 
 async function getTenantAccessToken(): Promise<string> {
   const { appId, appSecret } = CONFIG.feishu;
@@ -98,37 +84,25 @@ async function uploadImage(imageBuffer: Buffer): Promise<string> {
 
   const body = Buffer.concat(parts);
 
-  return new Promise((resolve, reject) => {
-    const req = https.request({
-      hostname: 'open.feishu.cn',
-      path: '/open-apis/im/v1/images',
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': body.length,
-      },
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const result = JSON.parse(data);
-          if (result.code !== 0) {
-            reject(new Error(`Upload image failed: code=${result.code} msg=${result.msg}`));
-          } else {
-            console.log(`[Feishu] Image uploaded: ${result.data.image_key}`);
-            resolve(result.data.image_key);
-          }
-        } catch {
-          reject(new Error('Failed to parse upload response'));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
+  const resp = await httpsRequest('https://open.feishu.cn/open-apis/im/v1/images', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    },
+    body,
   });
+  let result: { code: number; msg?: string; data?: { image_key: string } };
+  try {
+    result = JSON.parse(resp.data);
+  } catch {
+    throw new Error('Failed to parse upload response');
+  }
+  if (result.code !== 0) {
+    throw new Error(`Upload image failed: code=${result.code} msg=${result.msg}`);
+  }
+  console.log(`[Feishu] Image uploaded: ${result.data!.image_key}`);
+  return result.data!.image_key;
 }
 
 /**
@@ -142,14 +116,16 @@ async function urgentApp(messageId: string): Promise<void> {
   const openId = CONFIG.feishu.urgentOpenId;
   if (!openId) return;
   const token = await getTenantAccessToken();
-  const resp = await httpRequest(
+  const resp = await httpsRequest(
     `https://open.feishu.cn/open-apis/im/v1/messages/${messageId}/urgent_app?user_id_type=open_id`,
-    JSON.stringify({ user_id_list: [openId] }),
     {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json; charset=utf-8',
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
+      body: JSON.stringify({ user_id_list: [openId] }),
     },
-    'PATCH',
   );
   const result = JSON.parse(resp.data);
   if (result.code !== 0) {

@@ -1,6 +1,6 @@
-import * as https from 'https';
 import { loadLocalData, saveLocalData, needsUpdate } from './storage';
 import { getLatestTradingDate } from '../utils/date';
+import { httpsJson } from './httpClient';
 
 export interface KlineData {
   date: string;    // YYYY-MM-DD
@@ -107,40 +107,14 @@ function _fetchCsiChunkRaw(
   startDate: string,
   endDate: string,
 ): Promise<CsiPerfItem[]> {
-  return new Promise((resolve, reject) => {
-    const url = `${CSI_API}?indexCode=${indexCode}&startDate=${startDate}&endDate=${endDate}`;
-    console.log(`[CSI] Fetching ${indexCode} ${startDate}-${endDate}...`);
-
-    const req = https.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://www.csindex.com.cn/',
-      },
-    }, (res) => {
-      if (res.statusCode && res.statusCode !== 200) {
-        res.resume();
-        reject(new Error(`CSI API returned ${res.statusCode} for ${indexCode}`));
-        return;
-      }
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data) as CsiResponse;
-          if (json.code === '200' && json.data) {
-            resolve(json.data);
-          } else {
-            resolve([]);
-          }
-        } catch {
-          reject(new Error(`CSI API parse error for ${indexCode}: ${data.substring(0, 100)}`));
-        }
-      });
-    });
-
-    req.on('error', reject);
-    req.setTimeout(30000, () => { req.destroy(new Error('CSI request timeout')); });
-  });
+  const url = `${CSI_API}?indexCode=${indexCode}&startDate=${startDate}&endDate=${endDate}`;
+  console.log(`[CSI] Fetching ${indexCode} ${startDate}-${endDate}...`);
+  return httpsJson<CsiResponse>(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.csindex.com.cn/',
+    },
+  }).then((json) => (json.code === '200' && json.data ? json.data : []));
 }
 
 /**
@@ -151,42 +125,28 @@ function fetchTencentKline(
   startDate: string,  // YYYY-MM-DD
   endDate: string,
 ): Promise<KlineData[]> {
-  return new Promise((resolve, reject) => {
-    const url = `${TENCENT_API}?param=${tencentCode},day,${startDate},${endDate},500,`;
-    console.log(`[Tencent] Fetching ${tencentCode} ${startDate}-${endDate}...`);
-
-    const req = https.get(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => {
-        try {
-          const json = JSON.parse(data);
-          const key = Object.keys(json.data || {})[0];
-          if (!key) { resolve([]); return; }
-          const days: string[][] = json.data[key].day || json.data[key].qfqday || [];
-          const result = days.map((d: string[]) => ({
-            date: d[0],
-            open: parseFloat(d[1]),
-            close: parseFloat(d[2]),
-            high: parseFloat(d[3]),
-            low: parseFloat(d[4]),
-            volume: parseFloat(d[5]) || 0,
-            amount: 0,
-            amplitude: 0,
-            changePercent: 0,
-            changeAmount: 0,
-            turnover: 0,
-          }));
-          resolve(result);
-        } catch {
-          reject(new Error(`Tencent API parse error for ${tencentCode}`));
-        }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(15000, () => { req.destroy(new Error('Tencent request timeout')); });
+  const url = `${TENCENT_API}?param=${tencentCode},day,${startDate},${endDate},500,`;
+  console.log(`[Tencent] Fetching ${tencentCode} ${startDate}-${endDate}...`);
+  return httpsJson<{ data?: Record<string, { day?: string[][]; qfqday?: string[][] }> }>(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    timeoutMs: 15000,
+  }).then((json) => {
+    const key = Object.keys(json.data || {})[0];
+    if (!key) return [];
+    const days: string[][] = json.data![key].day || json.data![key].qfqday || [];
+    return days.map((d) => ({
+      date: d[0],
+      open: parseFloat(d[1]),
+      close: parseFloat(d[2]),
+      high: parseFloat(d[3]),
+      low: parseFloat(d[4]),
+      volume: parseFloat(d[5]) || 0,
+      amount: 0,
+      amplitude: 0,
+      changePercent: 0,
+      changeAmount: 0,
+      turnover: 0,
+    }));
   });
 }
 

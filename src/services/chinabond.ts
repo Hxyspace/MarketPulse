@@ -1,7 +1,7 @@
-import * as https from 'https';
 import { CONFIG } from '../config';
 import { loadLocalData, saveLocalData, needsUpdate } from './storage';
 import { tsToBjDate, getLatestTradingDate } from '../utils/date';
+import { httpsJson } from './httpClient';
 
 export interface BondIndexData {
   date: string;   // YYYY-MM-DD
@@ -9,6 +9,10 @@ export interface BondIndexData {
 }
 
 const STORAGE_KEY = 'chinabond_net_price.json';
+
+interface ChinabondResponse {
+  JJZS_00?: Record<string, number>;
+}
 
 /**
  * 从中债信息网获取中债新综合净价指数全量历史数据（2002年至今）
@@ -25,35 +29,18 @@ async function fetchChinabondFromApi(): Promise<BondIndexData[]> {
     locale: 'zh_CN',
   }).toString();
 
-  const json = await new Promise<Record<string, unknown>>((resolve, reject) => {
-    const url = new URL(CONFIG.chinabond.api);
-    const req = https.request({
-      hostname: url.hostname,
-      port: 443,
-      path: url.pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Content-Length': Buffer.byteLength(bodyStr),
-        'Referer': 'https://yield.chinabond.com.cn/',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-      rejectUnauthorized: false,
-    }, (res) => {
-      let data = '';
-      res.on('data', (chunk: string) => { data += chunk; });
-      res.on('end', () => {
-        try { resolve(JSON.parse(data)); }
-        catch (e) { reject(new Error('Failed to parse chinabond response')); }
-      });
-    });
-    req.on('error', reject);
-    req.setTimeout(30000, () => { req.destroy(new Error('Chinabond request timeout')); });
-    req.write(bodyStr);
-    req.end();
+  const json = await httpsJson<ChinabondResponse>(CONFIG.chinabond.api, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Referer': 'https://yield.chinabond.com.cn/',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+    },
+    body: bodyStr,
+    rejectUnauthorized: false,
   });
 
-  const rawData = json['JJZS_00'] as Record<string, number> | undefined;
+  const rawData = json.JJZS_00;
   if (!rawData) {
     throw new Error('Chinabond API: JJZS_00 data not found');
   }
