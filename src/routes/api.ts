@@ -6,7 +6,10 @@ import { getFundThermometer, getFundThermometerByDate } from '../calculators/fun
 const router = Router();
 
 function isValidDate(d: string | undefined): d is string {
-  return !!d && /^\d{4}-\d{2}-\d{2}$/.test(d);
+  if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  // 反查实际日期，挡掉 2025-02-30 等格式合规但不存在的日期
+  const dt = new Date(d + 'T00:00:00Z');
+  return !Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === d;
 }
 
 // 40日收益差数据

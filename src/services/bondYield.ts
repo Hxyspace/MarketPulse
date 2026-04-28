@@ -45,7 +45,7 @@ async function fetchYieldFromApi(startDate: string, endDate: string): Promise<Bo
   );
 
   if (!Array.isArray(json) || json.length === 0 || !json[0].seriesData) {
-    return [];
+    throw new Error(`BondYield API returned no seriesData for ${startDate}~${endDate}`);
   }
   const result: BondYieldData[] = json[0].seriesData.map((item) => ({
     date: tsToBjDate(item[0]),
@@ -81,7 +81,7 @@ export async function getBondYieldData(): Promise<BondYieldData[]> {
         const deduped = newData.filter(d => !dateSet.has(d.date));
         const merged = [...stored.items, ...deduped].sort((a, b) => a.date.localeCompare(b.date));
         saveLocalData(STORAGE_KEY, merged);
-        console.log(`[Storage] ${STORAGE_KEY}: updated to ${merged.length} items`);
+        console.log(`[Storage] ${STORAGE_KEY}: updated to ${merged.length} items (+${deduped.length} new)`);
         return merged;
       } else {
         console.warn(`[BondYield] No new data returned for ${startDate} to ${endDate}`);

@@ -49,7 +49,7 @@ interface CsiPerfItem {
   changePct: number;
   tradingVol: number;   // 亿股
   tradingValue: number; // 亿元
-  peg?: number;         // 市盈率
+  peg?: number;         // CSI 官方字段名，语义为滚动市盈率 TTM（不是 PEG）
 }
 
 interface CsiResponse {
