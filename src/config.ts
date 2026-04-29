@@ -38,6 +38,8 @@ export const CONFIG = {
     days: 40,
     // 需要的历史数据天数 (交易日约为日历日的 70%)
     historyDays: 120,
+    // 前端 / 推送展示的历史起点（更早的数据仅参与计算，不展示）
+    historyStartDate: '2020-01-01',
     thresholds: {
       overheated: 10,   // +10% 以上：过热，逐步减仓
       normal: -1,       // -1% ~ +10%：正常，持有收息

@@ -25,7 +25,8 @@ export function loadLocalData<T>(filename: string): StoredData<T> | null {
   try {
     const raw = fs.readFileSync(filepath, 'utf-8');
     return JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    console.warn(`[Storage] Failed to parse ${filename}, will refetch:`, err instanceof Error ? err.message : err);
     return null;
   }
 }

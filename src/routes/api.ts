@@ -61,6 +61,9 @@ router.get('/fund-thermometer', async (req: Request, res: Response) => {
   }
 });
 
+// 占位端点：兼容前端 Refresh 按钮。服务端无内存缓存，文件级缓存由 needsUpdate 自动管理；
+// 前端调完此端点后会重新 fetch 三大模块，效果等同于"重新渲染"。
+// 如需强制重新拉外部数据源，需手动删除 src/data/*.json。
 router.post('/refresh', (_req: Request, res: Response) => {
   res.json({ ok: true, message: 'Cache cleared' });
 });

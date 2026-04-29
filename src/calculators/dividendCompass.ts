@@ -27,12 +27,11 @@ export function calculate40DayDiff(
   allShareData: KlineData[],
   tradingDays: number = 40,
 ): CompassResult[] {
-  // 对齐日期
-  const dateSet = new Set(dividendData.map(d => d.date));
-  const alignedAllShare = allShareData.filter(d => dateSet.has(d.date));
-  const alignedDividend = dividendData.filter(d =>
-    new Set(alignedAllShare.map(a => a.date)).has(d.date)
-  );
+  // 对齐日期：取两个序列的日期交集
+  const dividendDates = new Set(dividendData.map(d => d.date));
+  const alignedAllShare = allShareData.filter(d => dividendDates.has(d.date));
+  const allShareDates = new Set(alignedAllShare.map(d => d.date));
+  const alignedDividend = dividendData.filter(d => allShareDates.has(d.date));
 
   if (alignedDividend.length < tradingDays + 1) {
     return [];
@@ -99,7 +98,7 @@ export async function getDividendCompassByDate(queryDate: string): Promise<Compa
   ]);
 
   const allResults = calculate40DayDiff(dividendData, allShareData);
-  const history = allResults.filter(r => r.date >= '2020-01-01');
+  const history = allResults.filter(r => r.date >= CONFIG.returnDiff.historyStartDate);
 
   let latest = history[history.length - 1];
   for (const r of history) {
