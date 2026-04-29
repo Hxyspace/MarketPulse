@@ -1,3 +1,4 @@
+const echarts = window.echarts
 var API_BASE = '/api';
 
 /* ── Theme colors ── */
@@ -479,3 +480,9 @@ window.addEventListener('resize', function() {
     if (inst) inst.resize();
   });
 });
+
+// Expose to inline onclick/onchange handlers
+window.toggleTheme = toggleTheme;
+window.goToday = goToday;
+window.refreshAll = refreshAll;
+window.loadAll = loadAll;
