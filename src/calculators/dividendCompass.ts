@@ -1,6 +1,7 @@
 import { fetchDividendLowVol, fetchAllShare, KlineData } from '../services/eastmoney';
 import { CONFIG } from '../config';
 import { bjDate } from '../utils/date';
+import { StatusKind } from '../utils/status';
 
 export interface CompassResult {
   date: string;
@@ -8,6 +9,7 @@ export interface CompassResult {
   allShareReturn40d: number;  // 中证全指40日收益率 %
   diff: number;               // 40日收益差 %
   status: string;             // 罗盘状态
+  statusKind: StatusKind;     // 结构化状态
   interpretation: string;     // 操作建议
 }
 
@@ -47,31 +49,44 @@ export function calculate40DayDiff(
     const allShareReturn = (allToday / allPrev - 1) * 100;
     const diff = dividendReturn - allShareReturn;
 
+    const compass = evaluateCompass(diff);
     results.push({
       date: alignedDividend[i].date,
       dividendReturn40d: Math.round(dividendReturn * 100) / 100,
       allShareReturn40d: Math.round(allShareReturn * 100) / 100,
       diff: Math.round(diff * 100) / 100,
-      status: getCompassStatus(diff),
-      interpretation: getCompassInterpretation(diff),
+      ...compass,
     });
   }
 
   return results;
 }
 
-function getCompassStatus(diff: number): string {
+/**
+ * 计算罗盘状态
+ */
+function evaluateCompass(diff: number): { status: string; statusKind: StatusKind; interpretation: string } {
   const t = CONFIG.returnDiff.thresholds;
-  if (diff >= t.overheated) return '🔥 过热';
-  if (diff >= t.normal) return '😊 适中';
-  return '❄️ 过冷';
-}
 
-function getCompassInterpretation(diff: number): string {
-  const t = CONFIG.returnDiff.thresholds;
-  if (diff >= t.overheated) return '红利类资产热度过热，宜逐步减仓';
-  if (diff >= t.normal) return '红利类资产热度适中，宜持有收益';
-  return '红利类资产过冷，宜逢低加仓';
+  let status: string;
+  let statusKind: StatusKind;
+  let interpretation: string;
+
+  if (diff >= t.overheated) {
+    status = '🔥 过热';
+    statusKind = StatusKind.HOT;
+    interpretation = '红利类资产热度过热，宜逐步减仓';
+  } else if (diff >= t.normal) {
+    status = '😊 适中';
+    statusKind = StatusKind.NORMAL;
+    interpretation = '红利类资产热度适中，宜持有收益';
+  } else {
+    status = '❄️ 过冷';
+    statusKind = StatusKind.COLD;
+    interpretation = '红利类资产过冷，宜逢低加仓';
+  }
+
+  return { status, statusKind, interpretation };
 }
 
 /**

@@ -1,6 +1,7 @@
 import { fetchCSI300, KlineData } from '../services/eastmoney';
 import { getBondYieldData, BondYieldData } from '../services/bondYield';
 import { bjDate } from '../utils/date';
+import { StatusKind } from '../utils/status';
 
 export interface ErpHistoryItem {
   date: string;
@@ -12,6 +13,7 @@ export interface FundThermometerResult {
   date: string;
   temperature: number;      // 温度 ℃
   status: string;           // 状态描述
+  statusKind: StatusKind;   // 结构化状态
   interpretation: string;   // 操作建议
   csi300Close: number;      // 沪深300收盘价
   csi300Change: number;     // 沪深300涨跌幅
@@ -78,16 +80,29 @@ export async function getFundThermometer(): Promise<FundThermometerResult> {
   return result;
 }
 
-function getTemperatureStatus(temp: number): string {
-  if (temp >= 80) return '🔥 高温区';
-  if (temp >= 31) return '😊 正常区';
-  return '❄️ 低温区';
-}
+/**
+ * 计算基金温度状态
+ */
+function evaluateThermometer(temp: number): { status: string; statusKind: StatusKind; interpretation: string } {
+  let status: string;
+  let statusKind: StatusKind;
+  let interpretation: string;
 
-function getTemperatureInterpretation(temp: number): string {
-  if (temp >= 80) return '市场过热，暂停定投，及时止盈';
-  if (temp >= 31) return '市场正常，按计划定投';
-  return '市场低估，加倍定投';
+  if (temp >= 80) {
+    status = '🔥 高温区';
+    statusKind = StatusKind.HOT;
+    interpretation = '市场过热，暂停定投，及时止盈';
+  } else if (temp >= 31) {
+    status = '😊 正常区';
+    statusKind = StatusKind.NORMAL;
+    interpretation = '市场正常，按计划定投';
+  } else {
+    status = '❄️ 低温区';
+    statusKind = StatusKind.COLD;
+    interpretation = '市场低估，加倍定投';
+  }
+
+  return { status, statusKind, interpretation };
 }
 
 /**
@@ -114,12 +129,14 @@ export async function getFundThermometerByDate(queryDate: string): Promise<FundT
   const erpPercentile = (erpValues.filter(v => v < latest.erp).length / erpValues.length) * 100;
   // 温度 = 100 - 股债利差百分位
   const temperature = Math.round((100 - erpPercentile) * 10) / 10;
+  const evalResult = evaluateThermometer(temperature);
 
   return {
     date: latest.date,
     temperature,
-    status: getTemperatureStatus(temperature),
-    interpretation: getTemperatureInterpretation(temperature),
+    status: evalResult.status,
+    statusKind: evalResult.statusKind,
+    interpretation: evalResult.interpretation,
     csi300Close: latest.close,
     csi300Change: latest.changePercent || Math.round((latest.close / prev.close - 1) * 10000) / 100,
     pe: Math.round(latest.pe * 100) / 100,
@@ -133,14 +150,15 @@ export async function getFundThermometerByDate(queryDate: string): Promise<FundT
 /**
  * 获取前一交易日的基金温度状态（用于极端信号检测）
  */
-export function getPrevFundStatus(result: FundThermometerResult): string {
+export function getPrevFundStatus(result: FundThermometerResult): StatusKind | '' {
   const history = result.erpHistory;
   if (history.length < 2) return '';
-  const recent10y = history.slice(-2500);
-  const prev = recent10y[recent10y.length - 2];
+  // 计算 prev 当日的温度时，分母窗口必须截止到 prev 当日，不能包含 latest
+  const prevWindow = history.slice(0, -1).slice(-2500);
+  const prev = prevWindow[prevWindow.length - 1];
   if (!prev) return '';
-  const erpValues = recent10y.map(d => d.erp);
+  const erpValues = prevWindow.map(d => d.erp);
   const prevPercentile = (erpValues.filter(v => v < prev.erp).length / erpValues.length) * 100;
   const prevTemperature = Math.round((100 - prevPercentile) * 10) / 10;
-  return getTemperatureStatus(prevTemperature);
+  return evaluateThermometer(prevTemperature).statusKind;
 }

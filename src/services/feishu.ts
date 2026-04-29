@@ -2,6 +2,7 @@ import { CONFIG } from '../config';
 import { generateReportImage, ReportData } from './reportImage';
 import { generateDashboardImage, DashboardData } from './dashboardImage';
 import { httpsRequest } from './httpClient';
+import { StatusKind } from '../utils/status';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
@@ -154,9 +155,9 @@ export async function sendFeishuMessage(title: string, content: string): Promise
 }
 
 export async function sendDailyReport(data: {
-  returnDiff: { date: string; diff: number; status: string; prevStatus: string; divReturn: number; allReturn: number };
-  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number; status: string; prevStatus: string };
-  thermometer: { date: string; temperature: number; status: string; prevStatus: string; pe: number; bondYield: number; erp: number };
+  returnDiff: { date: string; diff: number; status: string; statusKind: StatusKind; prevStatusKind: StatusKind | ''; divReturn: number; allReturn: number };
+  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number; status: string; statusKind: StatusKind; prevStatusKind: StatusKind | '' };
+  thermometer: { date: string; temperature: number; status: string; statusKind: StatusKind; prevStatusKind: StatusKind | ''; pe: number; bondYield: number; erp: number };
   diffHistory?: { date: string; diff: number }[];
   bondHistory?: { date: string; value: number }[];
   erpHistory?: { date: string; erp: number; close: number }[];
@@ -232,16 +233,17 @@ export async function sendDailyReport(data: {
   // 3) 极端信号预警：前一交易日在正常区，当日进入极端区时发送加急消息
   const alerts: string[] = [];
 
-  const isNormal = (s: string) => s.includes('适中') || s.includes('正常');
-  const isCold = (s: string) => s.includes('过冷') || s.includes('低估') || s.includes('低温');
-  const isHot = (s: string) => s.includes('过热') || s.includes('高估') || s.includes('高温');
+  const enteredHot = (prev: StatusKind | '', curr: StatusKind) =>
+    prev === StatusKind.NORMAL && curr === StatusKind.HOT;
+  const enteredCold = (prev: StatusKind | '', curr: StatusKind) =>
+    prev === StatusKind.NORMAL && curr === StatusKind.COLD;
 
-  if (isNormal(returnDiff.prevStatus) && isHot(returnDiff.status)) alerts.push(`🔥 红利进入过热区（收益差 ${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%），宜逐步减仓`);
-  if (isNormal(returnDiff.prevStatus) && isCold(returnDiff.status)) alerts.push(`❄️ 红利进入过冷区（收益差 ${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%），宜逢低加仓`);
-  if (isNormal(bondWeather.prevStatus) && isHot(bondWeather.status)) alerts.push(`🔥 债市进入高估区（温度 ${bondWeather.temperature}℃），建议适时止盈`);
-  if (isNormal(bondWeather.prevStatus) && isCold(bondWeather.status)) alerts.push(`❄️ 债市进入低估区（温度 ${bondWeather.temperature}℃），适合买入`);
-  if (isNormal(thermometer.prevStatus) && isHot(thermometer.status)) alerts.push(`🔥 基金温度进入高温区（${thermometer.temperature}℃），暂停定投，及时止盈`);
-  if (isNormal(thermometer.prevStatus) && isCold(thermometer.status)) alerts.push(`❄️ 基金温度进入低温区（${thermometer.temperature}℃），加倍定投`);
+  if (enteredHot(returnDiff.prevStatusKind, returnDiff.statusKind)) alerts.push(`🔥 红利进入过热区（收益差 ${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%），宜逐步减仓`);
+  if (enteredCold(returnDiff.prevStatusKind, returnDiff.statusKind)) alerts.push(`❄️ 红利进入过冷区（收益差 ${returnDiff.diff > 0 ? '+' : ''}${returnDiff.diff}%），宜逢低加仓`);
+  if (enteredHot(bondWeather.prevStatusKind, bondWeather.statusKind)) alerts.push(`🔥 债市进入高估区（温度 ${bondWeather.temperature}℃），建议适时止盈`);
+  if (enteredCold(bondWeather.prevStatusKind, bondWeather.statusKind)) alerts.push(`❄️ 债市进入低估区（温度 ${bondWeather.temperature}℃），适合买入`);
+  if (enteredHot(thermometer.prevStatusKind, thermometer.statusKind)) alerts.push(`🔥 基金温度进入高温区（${thermometer.temperature}℃），暂停定投，及时止盈`);
+  if (enteredCold(thermometer.prevStatusKind, thermometer.statusKind)) alerts.push(`❄️ 基金温度进入低温区（${thermometer.temperature}℃），加倍定投`);
 
   if (alerts.length > 0) {
     const alertContent = alerts.join('\n\n');

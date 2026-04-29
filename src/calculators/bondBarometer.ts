@@ -1,5 +1,6 @@
 import { getAllBondData, BondIndexData } from '../services/chinabond';
 import { bjDate } from '../utils/date';
+import { StatusKind } from '../utils/status';
 
 export interface BondBarometerResult {
   latest: {
@@ -13,6 +14,7 @@ export interface BondBarometerResult {
     value: number;          // 债市温度 ℃
     percentile: number;     // 净价指数在历史中的百分位
     status: string;         // 状态描述
+    statusKind: StatusKind; // 结构化状态
     interpretation: string; // 解读
   };
   history: BondIndexData[]; // 全量历史趋势（2002至今）
@@ -59,16 +61,20 @@ function calculateBondTemperature(allData: BondIndexData[], currentValue: number
   const temperature = Math.round(percentile * 10) / 10;
 
   let status: string;
+  let statusKind: StatusKind;
   let interpretation: string;
 
   if (temperature >= 80) {
     status = '🔥 高估';
+    statusKind = StatusKind.HOT;
     interpretation = '债市高估，有回撤风险，建议适时止盈，不宜大笔加仓';
   } else if (temperature >= 30) {
     status = '😊 适中';
+    statusKind = StatusKind.NORMAL;
     interpretation = '债市估值适中，可安心定投持有';
   } else {
     status = '❄️ 低估';
+    statusKind = StatusKind.COLD;
     interpretation = '债市低估，性价比高，适合单笔买入或定投';
   }
 
@@ -76,6 +82,7 @@ function calculateBondTemperature(allData: BondIndexData[], currentValue: number
     value: temperature,
     percentile: Math.round(percentile * 10) / 10,
     status,
+    statusKind,
     interpretation,
   };
 }
@@ -144,10 +151,10 @@ export async function getBondBarometer(): Promise<BondBarometerResult> {
 /**
  * 获取前一交易日的债市温度状态（用于极端信号检测）
  */
-export function getPrevBondStatus(result: BondBarometerResult): string {
+export function getPrevBondStatus(result: BondBarometerResult): StatusKind | '' {
   const allHistory = result.history;
   if (allHistory.length < 2) return '';
   const prevData = allHistory[allHistory.length - 2];
   const prevTemp = calculateBondTemperature(allHistory.slice(0, -1), prevData.value);
-  return prevTemp.status;
+  return prevTemp.statusKind;
 }
