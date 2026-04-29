@@ -1,8 +1,8 @@
 import cron from 'node-cron';
 import { CONFIG } from '../config';
-import { getDividendCompassData } from '../calculators/dividendCompass';
-import { getBondBarometer, getPrevBondStatus } from '../calculators/bondBarometer';
-import { getFundThermometer, getPrevFundStatus } from '../calculators/fundThermometer';
+import { getDividendCompassLatest } from '../calculators/dividendCompass';
+import { getBondBarometerLatest, getPrevBondStatus } from '../calculators/bondBarometer';
+import { getFundThermometerLatest, getPrevFundStatus } from '../calculators/fundThermometer';
 import { sendDailyReport } from '../services/feishu';
 
 export function startScheduler() {
@@ -14,9 +14,9 @@ export function startScheduler() {
     try {
       // 并行获取最新数据（storage层会自动增量更新）
       const [returnDiff, bondBarometer, thermometer] = await Promise.all([
-        getDividendCompassData(),
-        getBondBarometer(),
-        getFundThermometer(),
+        getDividendCompassLatest(),
+        getBondBarometerLatest(),
+        getFundThermometerLatest(),
       ]);
 
       const prevDiff = returnDiff.history.length >= 2 ? returnDiff.history[returnDiff.history.length - 2] : null;

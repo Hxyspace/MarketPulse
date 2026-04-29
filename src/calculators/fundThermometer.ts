@@ -39,11 +39,11 @@ function calcErpSeries(
     // 国债收益率可能不完全对齐交易日，找最近的
     let by = yieldMap.get(k.date);
     if (by === undefined) {
-      // 向前找最近3天
+      // 全程走 UTC 避免 ISO 解析与本地 setter 混用导致 off-by-one
+      const anchor = new Date(k.date + 'T00:00:00Z');
       for (let i = 1; i <= 5 && by === undefined; i++) {
-        const d = new Date(k.date);
-        d.setDate(d.getDate() - i);
-        by = yieldMap.get(d.toISOString().split('T')[0]);
+        anchor.setUTCDate(anchor.getUTCDate() - 1);
+        by = yieldMap.get(anchor.toISOString().split('T')[0]);
       }
     }
     if (by === undefined) continue;
@@ -74,7 +74,7 @@ function calcErpSeries(
  * 温度 = 100 - 股债利差的历史百分位
  * （百分位高→利差大→股票便宜→温度低）
  */
-export async function getFundThermometer(): Promise<FundThermometerResult> {
+export async function getFundThermometerLatest(): Promise<FundThermometerResult> {
   const result = await getFundThermometerByDate(bjDate());
   if (!result) throw new Error('No fund thermometer data available');
   return result;

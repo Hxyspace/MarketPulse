@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { getDividendCompassData, getDividendCompassByDate } from '../calculators/dividendCompass';
-import { getBondBarometer, getBondByDate } from '../calculators/bondBarometer';
-import { getFundThermometer, getFundThermometerByDate } from '../calculators/fundThermometer';
+import { getDividendCompassLatest, getDividendCompassByDate } from '../calculators/dividendCompass';
+import { getBondBarometerLatest, getBondBarometerByDate } from '../calculators/bondBarometer';
+import { getFundThermometerLatest, getFundThermometerByDate } from '../calculators/fundThermometer';
 
 const router = Router();
 
@@ -18,7 +18,7 @@ router.get('/return-diff', async (req: Request, res: Response) => {
     const date = req.query.date as string | undefined;
     const data = isValidDate(date)
       ? await getDividendCompassByDate(date)
-      : await getDividendCompassData();
+      : await getDividendCompassLatest();
     res.json({ ok: true, data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -32,8 +32,8 @@ router.get('/bond-barometer', async (req: Request, res: Response) => {
   try {
     const date = req.query.date as string | undefined;
     const data = isValidDate(date)
-      ? await getBondByDate(date)
-      : await getBondBarometer();
+      ? await getBondBarometerByDate(date)
+      : await getBondBarometerLatest();
     res.json({ ok: true, data });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -48,7 +48,7 @@ router.get('/fund-thermometer', async (req: Request, res: Response) => {
     const date = req.query.date as string | undefined;
     const data = isValidDate(date)
       ? await getFundThermometerByDate(date)
-      : await getFundThermometer();
+      : await getFundThermometerLatest();
     if (!data) {
       res.status(404).json({ ok: false, error: '该日期无数据' });
       return;
@@ -76,7 +76,7 @@ router.get('/query', async (req: Request, res: Response) => {
 
     const [returnDiffResult, bondResult, fund] = await Promise.all([
       getDividendCompassByDate(date).catch(() => null),
-      getBondByDate(date).catch(() => null),
+      getBondBarometerByDate(date).catch(() => null),
       getFundThermometerByDate(date).catch(() => null),
     ]);
 

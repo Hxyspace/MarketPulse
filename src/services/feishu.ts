@@ -6,15 +6,6 @@ import { StatusKind } from '../utils/status';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
-async function httpPost(
-  url: string,
-  body: string,
-  headers: Record<string, string>,
-  method: 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'POST',
-): Promise<{ status: number; data: string }> {
-  return httpsRequest(url, { method, headers, body });
-}
-
 async function getTenantAccessToken(): Promise<string> {
   const { appId, appSecret } = CONFIG.feishu;
   if (!appId || !appSecret) throw new Error('FEISHU_APP_ID or FEISHU_APP_SECRET not configured');
@@ -24,10 +15,13 @@ async function getTenantAccessToken(): Promise<string> {
     return tokenCache.token;
   }
 
-  const resp = await httpPost(
+  const resp = await httpsRequest(
     'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal',
-    JSON.stringify({ app_id: appId, app_secret: appSecret }),
-    { 'Content-Type': 'application/json; charset=utf-8' },
+    {
+      method: 'POST',
+      body: JSON.stringify({ app_id: appId, app_secret: appSecret }),
+      headers: { 'Content-Type': 'application/json; charset=utf-8' },
+    },
   );
 
   const result = JSON.parse(resp.data);
@@ -49,12 +43,15 @@ async function sendMessage(chatId: string, msgType: string, content: string): Pr
     content,
   });
 
-  const resp = await httpPost(
+  const resp = await httpsRequest(
     'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=chat_id',
-    body,
     {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json; charset=utf-8',
+      method: 'POST',
+      body,
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=utf-8',
+      },
     },
   );
 

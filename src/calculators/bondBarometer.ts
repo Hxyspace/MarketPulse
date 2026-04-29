@@ -90,7 +90,7 @@ function calculateBondTemperature(allData: BondIndexData[], currentValue: number
 /**
  * 查询指定日期的债市晴雨表
  */
-export async function getBondByDate(queryDate: string): Promise<BondBarometerResult> {
+export async function getBondBarometerByDate(queryDate: string): Promise<BondBarometerResult> {
   const allHistory = await getAllBondData();
 
   if (allHistory.length < 2) {
@@ -144,8 +144,8 @@ export async function getBondByDate(queryDate: string): Promise<BondBarometerRes
 /**
  * 获取最新债市晴雨表数据
  */
-export async function getBondBarometer(): Promise<BondBarometerResult> {
-  return getBondByDate(bjDate());
+export async function getBondBarometerLatest(): Promise<BondBarometerResult> {
+  return getBondBarometerByDate(bjDate());
 }
 
 /**

@@ -121,7 +121,8 @@ function _fetchCsiRaw(
 
 /**
  * 备用：从腾讯财经 API 获取指数日 K（单次最多 2000 条 ≈ 8 年）。
- * 当前主路径仅使用 CSI；保留 export 以便将来切换或调试，编译期不会被树摇删除。
+ * 仅当 CSI API 失败/为空时作为 fallback 触发，仅支持主流大盘指数。
+ * 注意：腾讯返回的数据没有 PE，因此无法替代 CSI 用于基金温度计 ERP 计算。
  */
 export function fetchTencentKline(
   tencentCode: string,
@@ -151,6 +152,36 @@ export function fetchTencentKline(
       turnover: 0,
     }));
   });
+}
+
+/**
+ * 拉取指数 K 线：优先 CSI（含 PE），失败或为空时回退到腾讯（无 PE）。
+ * startDate/endDate 均为 YYYYMMDD（CSI 风格），内部为腾讯做格式转换。
+ */
+async function fetchKlineWithFallback(
+  indexCode: string,
+  startDate: string,
+  endDate: string,
+): Promise<KlineData[]> {
+  let csiErr: unknown = null;
+  try {
+    const items = await fetchCsiAll(indexCode, startDate, endDate);
+    if (items.length > 0) return items.map(csiToKline);
+    console.warn(`[Fallback] CSI returned empty for ${indexCode} ${startDate}-${endDate}`);
+  } catch (err) {
+    csiErr = err;
+    console.warn(`[Fallback] CSI failed for ${indexCode}:`, err instanceof Error ? err.message : err);
+  }
+
+  const tencentCode = TENCENT_CODES[indexCode];
+  if (!tencentCode) {
+    if (csiErr) throw csiErr;
+    return [];
+  }
+
+  const fmt = (d: string) => `${d.substring(0, 4)}-${d.substring(4, 6)}-${d.substring(6, 8)}`;
+  console.log(`[Fallback] Using Tencent ${tencentCode} for ${indexCode}`);
+  return fetchTencentKline(tencentCode, fmt(startDate), fmt(endDate));
 }
 
 function csiToKline(item: CsiPerfItem): KlineData {
@@ -195,8 +226,7 @@ async function getIndexDataCached(
     const fetchStart = lastDate.replace(/-/g, '');
     const endDate = getLatestTradingDate().replace(/-/g, '');
     console.log(`[Storage] ${storageKey}: fetching from ${fetchStart} to ${endDate}...`);
-    const newItems = await fetchCsiAll(indexCode, fetchStart, endDate);
-    const newData = newItems.map(csiToKline);
+    const newData = await fetchKlineWithFallback(indexCode, fetchStart, endDate);
 
     if (newData.length > 0) {
       const dateSet = new Set(stored.items.map(d => d.date));
@@ -215,8 +245,7 @@ async function getIndexDataCached(
   // 首次拉取：从默认起始日期开始
   const endDate = getLatestTradingDate().replace(/-/g, '');
   console.log(`[Storage] ${storageKey}: initial fetch from ${DEFAULT_START_DATE} to ${endDate}...`);
-  const items = await fetchCsiAll(indexCode, DEFAULT_START_DATE, endDate);
-  const freshData = items.map(csiToKline);
+  const freshData = await fetchKlineWithFallback(indexCode, DEFAULT_START_DATE, endDate);
   if (freshData.length > 0) {
     saveLocalData(storageKey, freshData);
     console.log(`[Storage] ${storageKey}: saved ${freshData.length} items`);

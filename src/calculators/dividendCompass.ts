@@ -113,6 +113,6 @@ export async function getDividendCompassByDate(queryDate: string): Promise<Compa
 /**
  * 获取最新40日收益差数据
  */
-export async function getDividendCompassData(): Promise<CompassHistory> {
+export async function getDividendCompassLatest(): Promise<CompassHistory> {
   return getDividendCompassByDate(bjDate());
 }
