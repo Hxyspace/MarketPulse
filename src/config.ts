@@ -19,6 +19,18 @@ export const CONFIG = {
     indexId: '8a8b2ca0332abed20134ea76d8885831',
   },
 
+  // 招商银行外汇牌价 API
+  cmbFx: {
+    rateApi: 'https://fx.cmbchina.com/api/v1/fx/rate',
+    historyApi: 'https://fx.cmbchina.com/api/v1/fx/history-rate',
+    historyPage: 'https://fx.cmbchina.com/hq/history',
+    historyStartDate: '2009-01-01',
+    currencies: [
+      { nbr: '美元', code: 'USD', label: '美元 USD' },
+      { nbr: '港币', code: 'HKD', label: '港币 HKD' },
+    ] as const,
+  },
+
   // 飞书应用机器人推送（Open API）
   feishu: {
     appId: process.env.FEISHU_APP_ID || '',
@@ -31,6 +43,8 @@ export const CONFIG = {
   cron: {
     // 每个交易日 09:00 发送报告
     dailyReport: '0 9 * * 1-5',
+    // 每天 22:00 发送招商银行汇率图
+    cmbFxReport: '0 22 * * *',
   },
 
   // 40日收益差参数

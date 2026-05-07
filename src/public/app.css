@@ -362,6 +362,130 @@ body {
   box-shadow: var(--shadow-16);
 }
 
+/* ─── CMB FX module ─── */
+.fx-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.fx-rate-card {
+  padding: 24px 26px;
+  position: relative;
+}
+
+.fx-rate-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--green), var(--accent-light));
+}
+
+.fx-rate-card:nth-child(2)::before {
+  background: linear-gradient(90deg, var(--blue), var(--accent));
+}
+
+.fx-rate-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.fx-rate-label {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fx-rate-code {
+  margin-top: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.fx-rate-source {
+  font-size: 11px;
+  color: var(--accent);
+  background: var(--accent-subtle);
+  border: 1px solid var(--accent-tint);
+  border-radius: 999px;
+  padding: 4px 10px;
+  white-space: nowrap;
+}
+
+.fx-rate-lines {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.fx-rate-line {
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-divider);
+  border-radius: var(--radius-lg);
+  padding: 16px 18px;
+}
+
+.fx-rate-line span {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.fx-rate-line strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.fx-rate-line.buy strong { color: var(--green); }
+.fx-rate-line.sell strong { color: var(--red); }
+
+.fx-rate-sub {
+  margin-top: 14px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.fx-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.fx-chart-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 24px 0;
+}
+
+.fx-chart-title span {
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.fx-chart-title em {
+  font-style: normal;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
 /* ─── Compass Layout ─── */
 .compass-row {
   display: grid;
@@ -488,6 +612,7 @@ body {
   .header { padding: 0 20px; }
   .container { padding: 20px; }
   .indicator-strip { grid-template-columns: repeat(2, 1fr); }
+  .fx-rate-grid, .fx-chart-grid { grid-template-columns: 1fr; }
   .compass-row { grid-template-columns: 1fr; }
   .compass-gauge { border-right: none; border-bottom: 1px solid var(--border-divider); }
 }

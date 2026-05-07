@@ -3,10 +3,11 @@ import { CONFIG } from '../config';
 import { getDividendCompassLatest } from '../calculators/dividendCompass';
 import { getBondBarometerLatest, getPrevBondStatus } from '../calculators/bondBarometer';
 import { getFundThermometerLatest, getPrevFundStatus } from '../calculators/fundThermometer';
-import { sendDailyReport } from '../services/feishu';
+import { sendCmbFxReport, sendDailyReport } from '../services/feishu';
 
 export function startScheduler() {
   console.log(`[Cron] Scheduling daily report: ${CONFIG.cron.dailyReport}`);
+  console.log(`[Cron] Scheduling CMB FX report: ${CONFIG.cron.cmbFxReport}`);
 
   cron.schedule(CONFIG.cron.dailyReport, async () => {
     console.log(`[Cron] Running daily report at ${new Date().toISOString()}`);
@@ -59,6 +60,19 @@ export function startScheduler() {
       console.log('[Cron] Daily report sent successfully');
     } catch (err) {
       console.error('[Cron] Daily report failed:', err);
+    }
+  }, {
+    timezone: 'Asia/Shanghai',
+  });
+
+  cron.schedule(CONFIG.cron.cmbFxReport, async () => {
+    console.log(`[Cron] Running CMB FX report at ${new Date().toISOString()}`);
+
+    try {
+      await sendCmbFxReport();
+      console.log('[Cron] CMB FX report sent successfully');
+    } catch (err) {
+      console.error('[Cron] CMB FX report failed:', err);
     }
   }, {
     timezone: 'Asia/Shanghai',

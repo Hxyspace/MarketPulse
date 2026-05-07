@@ -1,6 +1,8 @@
 import { CONFIG } from '../config';
 import { generateReportImage, ReportData } from './reportImage';
 import { generateDashboardImage, DashboardData } from './dashboardImage';
+import { generateCmbFxImage } from '../modules/fx/services/cmbFxImage';
+import { getCmbFxReportData } from '../modules/fx/services/cmbFx';
 import { httpsRequest } from './httpClient';
 import { StatusKind } from '../utils/status';
 
@@ -149,6 +151,31 @@ export async function sendFeishuMessage(title: string, content: string): Promise
   };
 
   await sendMessage(chatId, 'interactive', JSON.stringify(card));
+}
+
+export async function sendCmbFxReport(): Promise<void> {
+  const { chatId } = CONFIG.feishu;
+  if (!chatId) {
+    console.warn('[Feishu] FEISHU_CHAT_ID not configured, skipping CMB FX report');
+    return;
+  }
+
+  const data = await getCmbFxReportData();
+  const buf = await generateCmbFxImage(data);
+  const imageKey = await uploadImage(buf);
+
+  // Card message with report image
+  const elements: any[] = [];
+  elements.push({ tag: 'img', img_key: imageKey, alt: { tag: 'plain_text', content: '外币汇率' } });
+  const baseUrl = (CONFIG.lanUrl || `http://localhost:${CONFIG.port}`).replace(/\/$/, '');
+  const appLink = `https://applink.feishu.cn/client/web_url/open?mode=appCenter&url=${encodeURIComponent(`${baseUrl}/fx`)}`;
+  elements.push({ tag: 'hr' });
+  elements.push({ tag: 'markdown', content: `🔗 [Dashboard](${appLink})` });
+
+  await sendMessage(chatId, 'interactive', JSON.stringify({
+    header: { title: { tag: 'plain_text', content: `💱 外币汇率 ${data.date}` }, template: 'blue' },
+    elements,
+  }));
 }
 
 export async function sendDailyReport(data: {

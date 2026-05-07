@@ -37,6 +37,7 @@ export function loadLocalData<T>(filename: string): StoredData<T> | null {
 export function saveLocalData<T>(filename: string, items: T[], lastUpdate?: string): void {
   ensureDir();
   const filepath = path.join(DATA_DIR, filename);
+  fs.mkdirSync(path.dirname(filepath), { recursive: true });
   const data: StoredData<T> = {
     items,
     lastUpdate: lastUpdate || new Date().toISOString(),

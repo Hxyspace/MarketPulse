@@ -2,8 +2,11 @@ import { Router, Request, Response } from 'express';
 import { getDividendCompassLatest, getDividendCompassByDate } from '../calculators/dividendCompass';
 import { getBondBarometerLatest, getBondBarometerByDate } from '../calculators/bondBarometer';
 import { getFundThermometerLatest, getFundThermometerByDate } from '../calculators/fundThermometer';
+import fxRouter from '../modules/fx/routes';
 
 const router = Router();
+
+router.use('/fx', fxRouter);
 
 function isValidDate(d: string | undefined): d is string {
   if (!d || !/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;

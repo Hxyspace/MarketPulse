@@ -23,6 +23,11 @@ app.get('/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// 汇率页
+app.get('/fx', (_req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'fx.html'));
+});
+
 async function start() {
   const port = await getPort({
     port: portNumbers(CONFIG.port, CONFIG.port + 100)
@@ -34,7 +39,8 @@ async function start() {
     const lanUrl = `http://${ip ?? 'localhost'}:${port}`;
     CONFIG.lanUrl = lanUrl;
     console.log(`\n🚀 Money Dashboard running at ${lanUrl}\n`);
-    console.log('📊 红利罗盘 + 债市晴雨表 + 基金温度计\n');
+    console.log(`💱 CMB FX dashboard running at ${lanUrl}/fx\n`);
+    console.log('📊 红利罗盘 + 债市晴雨表 + 基金温度计 + 招行汇率\n');
 
     // 启动定时任务
     startScheduler();

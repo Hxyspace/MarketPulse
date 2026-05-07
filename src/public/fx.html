@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Market Pulse · FX</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💱</text></svg>">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-left">
+    <h1><span>M</span>arket Pulse</h1>
+    <div class="header-divider"></div>
+    <div class="header-date" id="fxUpdateTime">loading...</div>
+  </div>
+  <div class="header-right">
+    <button class="btn" onclick="goMarket()">Market</button>
+    <button class="btn btn-primary" onclick="refreshAll()">Refresh</button>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode" id="themeBtn">🌙</button>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">FX</span>
+      <span class="section-title">招商银行实时汇率</span>
+      <span class="section-subtitle">现汇卖出 / 买入 · 单位 100</span>
+    </div>
+    <div class="fx-rate-grid">
+      <div class="card fx-rate-card">
+        <div class="fx-rate-head">
+          <div>
+            <div class="fx-rate-label">美元</div>
+            <div class="fx-rate-code">USD · CNY/100</div>
+          </div>
+          <div class="fx-rate-source" id="fx-usd-source">招商银行</div>
+        </div>
+        <div class="fx-rate-lines">
+          <div class="fx-rate-line sell">
+            <span>现汇卖出</span>
+            <strong id="fx-usd-sell">—</strong>
+          </div>
+          <div class="fx-rate-line buy">
+            <span>现汇买入</span>
+            <strong id="fx-usd-buy">—</strong>
+          </div>
+        </div>
+        <div class="fx-rate-sub" id="fx-usd-sub">加载中</div>
+      </div>
+
+      <div class="card fx-rate-card">
+        <div class="fx-rate-head">
+          <div>
+            <div class="fx-rate-label">港币</div>
+            <div class="fx-rate-code">HKD · CNY/100</div>
+          </div>
+          <div class="fx-rate-source" id="fx-hkd-source">招商银行</div>
+        </div>
+        <div class="fx-rate-lines">
+          <div class="fx-rate-line sell">
+            <span>现汇卖出</span>
+            <strong id="fx-hkd-sell">—</strong>
+          </div>
+          <div class="fx-rate-line buy">
+            <span>现汇买入</span>
+            <strong id="fx-hkd-buy">—</strong>
+          </div>
+        </div>
+        <div class="fx-rate-sub" id="fx-hkd-sub">加载中</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <span class="section-num">—</span>
+      <span class="section-title">招商银行历史汇率</span>
+      <span class="section-subtitle">默认展示最近半年</span>
+    </div>
+    <div class="fx-chart-grid">
+      <div class="card fx-chart-card">
+        <div class="fx-chart-title">
+          <span>美元 USD</span>
+          <em>现汇买入 vs 现汇卖出</em>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart chart-tall" id="fxUsdHistoryChart"></div>
+        </div>
+      </div>
+      <div class="card fx-chart-card">
+        <div class="fx-chart-title">
+          <span>港币 HKD</span>
+          <em>现汇买入 vs 现汇卖出</em>
+        </div>
+        <div class="chart-wrap">
+          <div class="chart chart-tall" id="fxHkdHistoryChart"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script type="module" src="./fx.js"></script>
+
+</body>
+</html>
