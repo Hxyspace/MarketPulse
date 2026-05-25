@@ -39,6 +39,11 @@ export const CONFIG = {
     urgentOpenId: process.env.FEISHU_URGENT_OPEN_ID || '',
   },
 
+  // 外部调用 API 鉴权（可选）
+  externalApi: {
+    token: process.env.MARKET_PULSE_API_TOKEN || '',
+  },
+
   // 定时任务 (cron 表达式)
   cron: {
     // 每个交易日 09:00 发送报告

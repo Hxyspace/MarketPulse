@@ -3,9 +3,11 @@ import { getDividendCompassLatest, getDividendCompassByDate } from '../calculato
 import { getBondBarometerLatest, getBondBarometerByDate } from '../calculators/bondBarometer';
 import { getFundThermometerLatest, getFundThermometerByDate } from '../calculators/fundThermometer';
 import fxRouter from '../modules/fx/routes';
+import externalRouter from './external';
 
 const router = Router();
 
+router.use('/external', externalRouter);
 router.use('/fx', fxRouter);
 
 function isValidDate(d: string | undefined): d is string {

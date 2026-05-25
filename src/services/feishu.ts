@@ -1,10 +1,9 @@
 import { CONFIG } from '../config';
-import { generateReportImage, ReportData } from './reportImage';
-import { generateDashboardImage, DashboardData } from './dashboardImage';
 import { generateCmbFxImage } from '../modules/fx/services/cmbFxImage';
-import { getCmbFxReportData } from '../modules/fx/services/cmbFx';
+import { CmbFxReportData, getCmbFxReportData } from '../modules/fx/services/cmbFx';
 import { httpsRequest } from './httpClient';
 import { StatusKind } from '../utils/status';
+import { DailyReportData, generateMarketReportImage } from './marketReport';
 
 let tokenCache: { token: string; expireAt: number } | null = null;
 
@@ -153,14 +152,14 @@ export async function sendFeishuMessage(title: string, content: string): Promise
   await sendMessage(chatId, 'interactive', JSON.stringify(card));
 }
 
-export async function sendCmbFxReport(): Promise<void> {
+export async function sendCmbFxReport(reportData?: CmbFxReportData): Promise<void> {
   const { chatId } = CONFIG.feishu;
   if (!chatId) {
     console.warn('[Feishu] FEISHU_CHAT_ID not configured, skipping CMB FX report');
     return;
   }
 
-  const data = await getCmbFxReportData();
+  const data = reportData ?? await getCmbFxReportData();
   const buf = await generateCmbFxImage(data);
   const imageKey = await uploadImage(buf);
 
@@ -178,14 +177,7 @@ export async function sendCmbFxReport(): Promise<void> {
   }));
 }
 
-export async function sendDailyReport(data: {
-  returnDiff: { date: string; diff: number; status: string; statusKind: StatusKind; prevStatusKind: StatusKind | ''; divReturn: number; allReturn: number };
-  bondWeather: { date: string; weather: string; value: number; change: number; temperature: number; status: string; statusKind: StatusKind; prevStatusKind: StatusKind | '' };
-  thermometer: { date: string; temperature: number; status: string; statusKind: StatusKind; prevStatusKind: StatusKind | ''; pe: number; bondYield: number; erp: number };
-  diffHistory?: { date: string; diff: number }[];
-  bondHistory?: { date: string; value: number }[];
-  erpHistory?: { date: string; erp: number; close: number }[];
-}): Promise<void> {
+export async function sendDailyReport(data: DailyReportData): Promise<void> {
   const { chatId } = CONFIG.feishu;
   if (!chatId) {
     console.warn('[Feishu] FEISHU_CHAT_ID not configured, skipping notification');
@@ -197,13 +189,7 @@ export async function sendDailyReport(data: {
   // 1) 生成简报图（3个gauge卡片）嵌入卡片消息
   let reportImageKey: string | null = null;
   try {
-    const reportData: ReportData = {
-      date: returnDiff.date,
-      returnDiff: { diff: returnDiff.diff, status: returnDiff.status },
-      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature, status: bondWeather.status },
-      thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
-    };
-    const buf = await generateReportImage(reportData);
+    const buf = await generateMarketReportImage(data, 'report');
     reportImageKey = await uploadImage(buf);
   } catch (err) {
     console.error('[Feishu] Report image failed:', err instanceof Error ? err.message : err);
@@ -238,16 +224,7 @@ export async function sendDailyReport(data: {
 
   // 2) 生成完整Dashboard图（带走势图）单独发送
   try {
-    const dashData: DashboardData = {
-      date: returnDiff.date,
-      returnDiff: { diff: returnDiff.diff, status: returnDiff.status, divReturn: returnDiff.divReturn, allReturn: returnDiff.allReturn },
-      bondWeather: { weather: bondWeather.weather, value: bondWeather.value, change: bondWeather.change, temperature: bondWeather.temperature, status: bondWeather.status },
-      thermometer: { temperature: thermometer.temperature, status: thermometer.status, pe: thermometer.pe, bondYield: thermometer.bondYield, erp: thermometer.erp },
-      diffHistory: data.diffHistory,
-      bondHistory: data.bondHistory,
-      erpHistory: data.erpHistory,
-    };
-    const dashBuf = await generateDashboardImage(dashData);
+    const dashBuf = await generateMarketReportImage(data, 'dashboard');
     const dashImageKey = await uploadImage(dashBuf);
     await sendImageMessage(chatId, dashImageKey);
   } catch (err) {

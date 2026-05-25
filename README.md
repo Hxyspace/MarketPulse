@@ -108,6 +108,7 @@ FEISHU_APP_ID=cli_xxxx           # App ID
 FEISHU_APP_SECRET=xxxx            # App Secret
 FEISHU_CHAT_ID=oc_xxxx            # 目标群聊 chat_id
 FEISHU_URGENT_OPEN_ID=ou_xxxx     # 加急推送目标用户 open_id（可选）
+MARKET_PULSE_API_TOKEN=xxxx       # /api/external/* Bearer Token（可选）
 ```
 
 3. 确保机器人已加入目标群聊
@@ -125,6 +126,30 @@ FEISHU_URGENT_OPEN_ID=ou_xxxx     # 加急推送目标用户 open_id（可选）
 
 **推送流程**：计算数据 → 生成图片 → 上传飞书 → 发送卡片 → 状态变化时加急推送
 
+## 🔌 外部调用 API
+
+新增 `/api/external` 供外部系统手动触发推送或直接获取图片。
+
+如设置 `MARKET_PULSE_API_TOKEN`，这些接口需要携带 `Authorization: Bearer <token>` 或 `X-API-Token: <token>`。
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| `POST` | `/api/external/push/barometer` | 触发市场日报飞书推送（速报卡片 + 全景仪表盘，兼容别名 `/push/market-report`） |
+| `POST` | `/api/external/push/fx` | 触发招商银行汇率飞书推送 |
+| `GET` | `/api/external/image/barometer?variant=dashboard` | 获取市场日报 PNG；`variant=report` 返回速报卡片，兼容别名 `/image/market-report` |
+| `GET` | `/api/external/image/fx` | 获取招商银行汇率 PNG |
+
+```bash
+# 触发市场日报推送
+curl -X POST http://localhost:3000/api/external/push/barometer
+
+# 拉取市场日报图（默认 dashboard）
+curl \
+  -H "Authorization: Bearer $MARKET_PULSE_API_TOKEN" \
+  "http://localhost:3000/api/external/image/barometer?variant=dashboard" \
+  --output market-report.png
+```
+
 ## 📁 项目结构
 
 ```
@@ -132,12 +157,14 @@ src/
 ├── config.ts                 # 集中配置
 ├── index.ts                  # Express 入口 + LAN IP 检测
 ├── routes/api.ts             # REST API
+├── routes/external.ts        # /api/external/* 外部调用 API
 ├── services/
 │   ├── eastmoney.ts          # 指数数据（CSI 官方 + 腾讯财经）
 │   ├── chinabond.ts          # 中债净价指数
 │   ├── bondYield.ts          # 10 年国债收益率
 │   ├── storage.ts            # JSON 文件存储
 │   ├── feishu.ts             # 飞书推送
+│   ├── marketReport.ts       # 市场日报组装与图片生成
 │   ├── reportImage.ts        # 速报卡片图片
 │   └── dashboardImage.ts     # 全景仪表盘图片
 ├── modules/
