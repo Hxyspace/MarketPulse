@@ -1,6 +1,6 @@
 {
   "name": "market-pulse",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "量化市场监控面板 — 红利罗盘 + 债市晴雨表 + 基金温度计",
   "main": "dist/index.js",
   "bin": {
